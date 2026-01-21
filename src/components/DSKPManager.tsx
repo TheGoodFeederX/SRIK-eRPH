@@ -4,7 +4,7 @@ import { type ReferensiRPH } from '../types';
 import {
     Plus, Search, Edit2, Trash2, X, Save, AlertCircle,
     ChevronLeft, ChevronRight, Loader2, CheckCircle2,
-    Database, Inbox
+    Database, Inbox, Filter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -196,186 +196,549 @@ export const DSKPManager: React.FC = () => {
         <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="glass-card"
-            style={{ padding: '2rem' }}
+            className="space-y-8"
         >
-            {/* Header Section */}
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-                <h2 style={{ color: 'var(--primary)', margin: 0 }}>Pengurusan DSKP</h2>
-                <button
-                    onClick={() => {
-                        setFormData({ subjek: '', tahun: '', sk: '' });
-                        setIsAddingNewSubjek(false);
-                        setIsAddingNewTahun(false);
-                        setIsAddModalOpen(true);
-                    }}
-                    className="btn btn-primary"
-                >
-                    <Plus size={18} /> Rekod Baru
-                </button>
-            </header>
-
-            {/* Filter Section */}
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap' }}>
-                <div style={{ position: 'relative', flex: '1', minWidth: '200px' }}>
-                    <Search style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
-                    <input
-                        type="text"
-                        placeholder="Cari subjek..."
-                        style={{ paddingLeft: '2.5rem' }}
-                        value={filterSubjek}
-                        onChange={(e) => setFilterSubjek(e.target.value)}
-                    />
-                </div>
-
-                <div style={{ position: 'relative', width: '180px' }}>
-                    <select
-                        value={filterTahun}
-                        onChange={(e) => setFilterTahun(e.target.value)}
-                        style={{ paddingRight: '2.5rem' }}
+            <div className="glass-card" style={{ padding: '2.5rem', borderRadius: '1.25rem' }}>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
+                    <div>
+                        <h2 style={{
+                            fontSize: '2rem',
+                            fontWeight: 800,
+                            color: 'var(--primary)',
+                            marginBottom: '0.5rem',
+                            letterSpacing: '-0.025em'
+                        }}>
+                            Pengurusan DSKP
+                        </h2>
+                        <p style={{
+                            color: 'var(--text-muted)',
+                            fontSize: '1.05rem',
+                            fontWeight: 500
+                        }}>
+                            Urus Subjek dan Standard Kandungan
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => {
+                            setFormData({ subjek: '', tahun: '', sk: '' });
+                            setIsAddingNewSubjek(false);
+                            setIsAddingNewTahun(false);
+                            setIsAddModalOpen(true);
+                        }}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.625rem',
+                            padding: '0.875rem 1.75rem',
+                            backgroundColor: 'var(--primary)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '0.75rem',
+                            fontWeight: 600,
+                            fontSize: '1rem',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 12px rgba(20, 133, 63, 0.2)',
+                            transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 8px 20px rgba(20, 133, 63, 0.3)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(20, 133, 63, 0.2)';
+                        }}
                     >
-                        <option value="">Semua Tahun</option>
-                        {uniqueYears.map(t => (
-                            <option key={String(t)} value={String(t)}>Tahun {t}</option>
-                        ))}
-                    </select>
+                        <Plus size={20} /> Tambah Rekod
+                    </button>
                 </div>
 
-                <div style={{ position: 'relative', flex: '1.5', minWidth: '250px' }}>
-                    <Database style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
-                    <input
-                        type="text"
-                        placeholder="Cari isi kandungan..."
-                        style={{ paddingLeft: '2.5rem' }}
-                        value={filterSK}
-                        onChange={(e) => setFilterSK(e.target.value)}
-                    />
-                </div>
-            </div>
-
-            {/* Table Section */}
-            <div className="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th style={{ width: '150px' }}>Subjek</th>
-                            <th style={{ width: '100px' }}>Tahun</th>
-                            <th>Standard Kandungan</th>
-                            <th className="no-print" style={{ width: '140px' }}>Tindakan</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <AnimatePresence mode="popLayout">
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={4} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                                        <Loader2 size={40} className="animate-spin" style={{ margin: '0 auto 1rem', color: 'var(--primary)' }} />
-                                        <p>Memuatkan data...</p>
-                                    </td>
-                                </tr>
-                            ) : filteredRecords.length === 0 ? (
-                                <tr>
-                                    <td colSpan={4} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-                                            <Inbox size={48} strokeWidth={1} />
-                                            <span style={{ fontWeight: 600 }}>Tiada rekod dijumpai</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : (
-                                paginatedRecords.map((record) => (
-                                    <motion.tr
-                                        key={record.id}
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        layout
-                                    >
-                                        <td>
-                                            <div style={{ fontWeight: 600, color: 'var(--primary)', fontSize: '0.85rem' }}>
-                                                {record.subjek}
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div style={{ fontWeight: 600 }}>
-                                                {record.tahun ? `Tahun ${record.tahun}` : 'Umum'}
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: '1.6', color: 'var(--text-main)' }}>
-                                                {record.sk}
-                                            </p>
-                                        </td>
-                                        <td className="no-print">
-                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                <button
-                                                    className="btn btn-outline"
-                                                    style={{ padding: '0.5rem' }}
-                                                    title="Kemaskini"
-                                                    onClick={() => openEditModal(record)}
-                                                >
-                                                    <Edit2 size={16} />
-                                                </button>
-                                                <button
-                                                    className="btn btn-outline"
-                                                    style={{ padding: '0.5rem', color: '#ef4444' }}
-                                                    title="Padam"
-                                                    onClick={() => setRecordToDelete(record)}
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </motion.tr>
-                                ))
-                            )}
-                        </AnimatePresence>
-                    </tbody>
-                </table>
-            </div>
-
-            {/* Pagination */}
-            {!loading && filteredRecords.length > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2rem', paddingTop: '1rem', borderTop: '1px solid var(--border)', flexWrap: 'wrap', gap: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)', fontWeight: 600 }}>Papar:</span>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            {[10, 50, 100].map(val => (
-                                <button
-                                    key={val}
-                                    onClick={() => setItemsPerPage(val)}
-                                    className={`btn ${itemsPerPage === val ? 'btn-primary' : 'btn-outline'}`}
-                                    style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }}
-                                >
-                                    {val}
-                                </button>
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                    gap: '1.25rem',
+                    marginBottom: '2.5rem',
+                    backgroundColor: '#f8fafc',
+                    padding: '1.75rem',
+                    borderRadius: '1rem',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
+                }}>
+                    <div>
+                        <label style={{
+                            display: 'block',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            color: '#64748b',
+                            marginBottom: '0.625rem',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em'
+                        }}>
+                            Subjek
+                        </label>
+                        <div style={{ position: 'relative' }}>
+                            <Search style={{
+                                position: 'absolute',
+                                left: '1rem',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                color: '#94a3b8'
+                            }} size={18} />
+                            <input
+                                type="text"
+                                placeholder="Cari subjek..."
+                                style={{
+                                    width: '100%',
+                                    paddingLeft: '3rem',
+                                    paddingRight: '1rem',
+                                    paddingTop: '0.75rem',
+                                    paddingBottom: '0.75rem',
+                                    borderRadius: '0.75rem',
+                                    border: '1.5px solid #e2e8f0',
+                                    fontSize: '0.95rem',
+                                    backgroundColor: 'white',
+                                    transition: 'all 0.2s ease',
+                                    outline: 'none'
+                                }}
+                                value={filterSubjek}
+                                onChange={(e) => setFilterSubjek(e.target.value)}
+                                onFocus={(e) => {
+                                    e.currentTarget.style.borderColor = 'var(--primary)';
+                                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20, 133, 63, 0.1)';
+                                }}
+                                onBlur={(e) => {
+                                    e.currentTarget.style.borderColor = '#e2e8f0';
+                                    e.currentTarget.style.boxShadow = 'none';
+                                }}
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label style={{
+                            display: 'block',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            color: '#64748b',
+                            marginBottom: '0.625rem',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em'
+                        }}>
+                            Tahun
+                        </label>
+                        <select
+                            style={{
+                                width: '100%',
+                                padding: '0.75rem 1rem',
+                                borderRadius: '0.75rem',
+                                border: '1.5px solid #e2e8f0',
+                                fontSize: '0.95rem',
+                                backgroundColor: 'white',
+                                transition: 'all 0.2s ease',
+                                outline: 'none',
+                                cursor: 'pointer'
+                            }}
+                            value={filterTahun}
+                            onChange={(e) => setFilterTahun(e.target.value)}
+                            onFocus={(e) => {
+                                e.currentTarget.style.borderColor = 'var(--primary)';
+                                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20, 133, 63, 0.1)';
+                            }}
+                            onBlur={(e) => {
+                                e.currentTarget.style.borderColor = '#e2e8f0';
+                                e.currentTarget.style.boxShadow = 'none';
+                            }}
+                        >
+                            <option value="">Semua Tahun</option>
+                            {[1, 2, 3, 4, 5, 6].map(t => (
+                                <option key={t} value={t}>Tahun {t}</option>
                             ))}
-                        </div>
+                        </select>
                     </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <button
-                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                            disabled={currentPage === 1}
-                            className="btn btn-outline"
-                            style={{ padding: '0.5rem' }}
-                        >
-                            <ChevronLeft size={18} />
-                        </button>
-                        <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
-                            {currentPage} <span style={{ color: 'var(--border)', margin: '0 0.5rem' }}>|</span> {totalPages || 1}
+                    <div>
+                        <label style={{
+                            display: 'block',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            color: '#64748b',
+                            marginBottom: '0.625rem',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em'
+                        }}>
+                            Standard Kandungan
+                        </label>
+                        <div style={{ position: 'relative' }}>
+                            <Filter style={{
+                                position: 'absolute',
+                                left: '1rem',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                color: '#94a3b8'
+                            }} size={18} />
+                            <input
+                                type="text"
+                                placeholder="Cari SK..."
+                                style={{
+                                    width: '100%',
+                                    paddingLeft: '3rem',
+                                    paddingRight: '1rem',
+                                    paddingTop: '0.75rem',
+                                    paddingBottom: '0.75rem',
+                                    borderRadius: '0.75rem',
+                                    border: '1.5px solid #e2e8f0',
+                                    fontSize: '0.95rem',
+                                    backgroundColor: 'white',
+                                    transition: 'all 0.2s ease',
+                                    outline: 'none'
+                                }}
+                                value={filterSK}
+                                onChange={(e) => setFilterSK(e.target.value)}
+                                onFocus={(e) => {
+                                    e.currentTarget.style.borderColor = 'var(--primary)';
+                                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20, 133, 63, 0.1)';
+                                }}
+                                onBlur={(e) => {
+                                    e.currentTarget.style.borderColor = '#e2e8f0';
+                                    e.currentTarget.style.boxShadow = 'none';
+                                }}
+                            />
                         </div>
-                        <button
-                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                            disabled={currentPage === totalPages || totalPages === 0}
-                            className="btn btn-outline"
-                            style={{ padding: '0.5rem' }}
-                        >
-                            <ChevronRight size={18} />
-                        </button>
                     </div>
                 </div>
-            )}
+
+                <div style={{
+                    borderRadius: '1rem',
+                    border: '1px solid #e2e8f0',
+                    overflow: 'hidden',
+                    minHeight: '500px',
+                    backgroundColor: 'white',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
+                }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                            <tr style={{
+                                backgroundColor: '#f8fafc',
+                                borderBottom: '2px solid #e2e8f0'
+                            }}>
+                                <th style={{
+                                    textAlign: 'left',
+                                    padding: '1.125rem 1.5rem',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 700,
+                                    color: '#64748b',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.05em',
+                                    width: '18%'
+                                }}>
+                                    Subjek
+                                </th>
+                                <th style={{
+                                    textAlign: 'left',
+                                    padding: '1.125rem 1.5rem',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 700,
+                                    color: '#64748b',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.05em',
+                                    width: '12%'
+                                }}>
+                                    Tahun
+                                </th>
+                                <th style={{
+                                    textAlign: 'left',
+                                    padding: '1.125rem 1.5rem',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 700,
+                                    color: '#64748b',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.05em',
+                                    width: '52%'
+                                }}>
+                                    Tajuk / Standard Kandungan
+                                </th>
+                                <th style={{
+                                    textAlign: 'right',
+                                    padding: '1.125rem 1.5rem',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 700,
+                                    color: '#64748b',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.05em',
+                                    width: '18%'
+                                }}>
+                                    Tindakan
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <AnimatePresence mode="wait">
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan={4} style={{
+                                            textAlign: 'center',
+                                            padding: '4rem 1.5rem',
+                                            color: 'var(--text-muted)'
+                                        }}>
+                                            <div style={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                justifyContent: 'center'
+                                            }}>
+                                                <Loader2 size={40} className="animate-spin" style={{
+                                                    color: 'var(--primary)',
+                                                    marginBottom: '1rem'
+                                                }} />
+                                                <span style={{ fontSize: '1.05rem', fontWeight: 500 }}>
+                                                    Memuatkan data...
+                                                </span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : filteredRecords.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={4} style={{
+                                            textAlign: 'center',
+                                            padding: '4rem 1.5rem',
+                                            color: 'var(--text-muted)',
+                                            fontSize: '1.05rem',
+                                            fontWeight: 500
+                                        }}>
+                                            <div className="flex flex-col items-center gap-4">
+                                                <Inbox size={48} strokeWidth={1} />
+                                                <span>Tiada rekod ditemui.</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    paginatedRecords.map((record) => (
+                                        <motion.tr
+                                            key={record.id}
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, x: -10 }}
+                                            transition={{ duration: 0.2 }}
+                                            style={{
+                                                borderBottom: '1px solid #f1f5f9',
+                                                transition: 'background-color 0.15s ease'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.backgroundColor = '#f8fafc';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.backgroundColor = 'transparent';
+                                            }}
+                                        >
+                                            <td style={{
+                                                padding: '1.25rem 1.5rem',
+                                                fontSize: '0.95rem',
+                                                fontWeight: 600,
+                                                color: '#0f172a'
+                                            }}>
+                                                {record.subjek}
+                                            </td>
+                                            <td style={{
+                                                padding: '1.25rem 1.5rem',
+                                                fontSize: '0.9rem',
+                                                color: '#64748b',
+                                                fontWeight: 500
+                                            }}>
+                                                {record.tahun ? `Tahun ${record.tahun}` : '-'}
+                                            </td>
+                                            <td style={{
+                                                padding: '1.25rem 1.5rem',
+                                                fontSize: '0.9rem',
+                                                color: '#475569',
+                                                lineHeight: '1.7',
+                                                whiteSpace: 'pre-wrap'
+                                            }}>
+                                                {record.sk}
+                                            </td>
+                                            <td style={{ padding: '1.25rem 1.5rem', textAlign: 'right' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.625rem' }}>
+                                                    <button
+                                                        onClick={() => openEditModal(record)}
+                                                        style={{
+                                                            padding: '0.625rem',
+                                                            backgroundColor: 'white',
+                                                            border: '1.5px solid #dbeafe',
+                                                            borderRadius: '0.625rem',
+                                                            color: '#2563eb',
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s ease',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center'
+                                                        }}
+                                                        title="Edit"
+                                                        onMouseEnter={(e) => {
+                                                            e.currentTarget.style.backgroundColor = '#eff6ff';
+                                                            e.currentTarget.style.borderColor = '#2563eb';
+                                                            e.currentTarget.style.transform = 'translateY(-1px)';
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            e.currentTarget.style.backgroundColor = 'white';
+                                                            e.currentTarget.style.borderColor = '#dbeafe';
+                                                            e.currentTarget.style.transform = 'translateY(0)';
+                                                        }}
+                                                    >
+                                                        <Edit2 size={17} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setRecordToDelete(record)}
+                                                        style={{
+                                                            padding: '0.625rem',
+                                                            backgroundColor: 'white',
+                                                            border: '1.5px solid #fee2e2',
+                                                            borderRadius: '0.625rem',
+                                                            color: '#dc2626',
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s ease',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center'
+                                                        }}
+                                                        title="Padam"
+                                                        onMouseEnter={(e) => {
+                                                            e.currentTarget.style.backgroundColor = '#fef2f2';
+                                                            e.currentTarget.style.borderColor = '#dc2626';
+                                                            e.currentTarget.style.transform = 'translateY(-1px)';
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            e.currentTarget.style.backgroundColor = 'white';
+                                                            e.currentTarget.style.borderColor = '#fee2e2';
+                                                            e.currentTarget.style.transform = 'translateY(0)';
+                                                        }}
+                                                    >
+                                                        <Trash2 size={17} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </motion.tr>
+                                    ))
+                                )}
+                            </AnimatePresence>
+                        </tbody>
+                    </table>
+                </div>
+
+                {!loading && filteredRecords.length > 0 && (
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '1.5rem',
+                        marginTop: '2rem',
+                        paddingTop: '1.5rem',
+                        borderTop: '1px solid #e2e8f0',
+                        flexWrap: 'wrap'
+                    }}>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            fontSize: '0.95rem',
+                            color: '#64748b',
+                            fontWeight: 500
+                        }}>
+                            <span>Papar</span>
+                            <select
+                                value={itemsPerPage}
+                                onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                                style={{
+                                    border: '1.5px solid #e2e8f0',
+                                    borderRadius: '0.625rem',
+                                    padding: '0.5rem 0.75rem',
+                                    outline: 'none',
+                                    backgroundColor: 'white',
+                                    cursor: 'pointer',
+                                    fontWeight: 600,
+                                    color: '#475569',
+                                    fontSize: '0.9rem'
+                                }}
+                            >
+                                <option value={10}>10</option>
+                                <option value={50}>50</option>
+                                <option value={100}>100</option>
+                            </select>
+                            <span>dari <strong style={{ color: '#0f172a' }}>{filteredRecords.length}</strong> rekod</span>
+                        </div>
+
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem'
+                        }}>
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                disabled={currentPage === 1}
+                                style={{
+                                    padding: '0.625rem',
+                                    borderRadius: '0.625rem',
+                                    border: '1.5px solid #e2e8f0',
+                                    backgroundColor: 'white',
+                                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                                    opacity: currentPage === 1 ? 0.5 : 1,
+                                    transition: 'all 0.2s ease',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#475569'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (currentPage !== 1) {
+                                        e.currentTarget.style.backgroundColor = '#f8fafc';
+                                        e.currentTarget.style.borderColor = '#cbd5e1';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'white';
+                                    e.currentTarget.style.borderColor = '#e2e8f0';
+                                }}
+                            >
+                                <ChevronLeft size={20} />
+                            </button>
+                            <span style={{
+                                fontWeight: 600,
+                                color: '#0f172a',
+                                fontSize: '0.95rem',
+                                padding: '0 0.5rem'
+                            }}>
+                                Halaman {currentPage} / {totalPages || 1}
+                            </span>
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                disabled={currentPage === totalPages || totalPages === 0}
+                                style={{
+                                    padding: '0.625rem',
+                                    borderRadius: '0.625rem',
+                                    border: '1.5px solid #e2e8f0',
+                                    backgroundColor: 'white',
+                                    cursor: (currentPage === totalPages || totalPages === 0) ? 'not-allowed' : 'pointer',
+                                    opacity: (currentPage === totalPages || totalPages === 0) ? 0.5 : 1,
+                                    transition: 'all 0.2s ease',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#475569'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (currentPage !== totalPages && totalPages !== 0) {
+                                        e.currentTarget.style.backgroundColor = '#f8fafc';
+                                        e.currentTarget.style.borderColor = '#cbd5e1';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'white';
+                                    e.currentTarget.style.borderColor = '#e2e8f0';
+                                }}
+                            >
+                                <ChevronRight size={20} />
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
 
             {/* Modal for Add/Edit */}
             <AnimatePresence>
