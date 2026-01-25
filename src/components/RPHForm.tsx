@@ -2,18 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Save, RefreshCw, Download, ChevronDown, X, Printer, ArrowLeft } from 'lucide-react';
 import type { RPHRecord } from '../types';
-import referenceData from '../erph_data.json';
+import { supabase } from '../lib/supabaseClient';
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
 import { RPHPrintLayout } from './RPHPrintLayout';
-
-interface ExcelRow {
-    subjek: string;
-    tahun: number | null;
-    sk: string;
-}
-
-const DATA: ExcelRow[] = referenceData as ExcelRow[];
 
 interface RPHFormProps {
     onSubmit: (record: Omit<RPHRecord, 'id'>) => void;
@@ -68,8 +60,8 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
         refleksi: initialData?.refleksi || '',
     });
 
-    const [subjects] = useState<string[]>(() => [...new Set(DATA.map(d => d.subjek))].sort());
-    const [years] = useState<number[]>(() => [...new Set(DATA.map(d => d.tahun).filter(y => y !== null))].sort((a, b) => (a as number) - (b as number)) as number[]);
+    const [subjects, setSubjects] = useState<string[]>([]);
+    const [years, setYears] = useState<number[]>([]);
     const [selectedYear, setSelectedYear] = useState<number | ''>('');
     const [availableSK, setAvailableSK] = useState<string[]>([]);
     // Track selected masa values for checkbox dropdown
@@ -83,13 +75,39 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
     const masaDropdownRef = useRef<HTMLDivElement>(null);
     const [showPrintModal, setShowPrintModal] = useState(false);
 
-    React.useEffect(() => {
-        if (!formData.subjek || selectedYear === '') {
-            setAvailableSK([]);
-            return;
-        }
-        const filtered = DATA.filter(d => d.subjek === formData.subjek && d.tahun === selectedYear);
-        setAvailableSK([...new Set(filtered.map(d => d.sk))].sort());
+    // Fetch initial data for Subjects and Years
+    useEffect(() => {
+        const fetchInitialData = async () => {
+            const { data: subjekData } = await supabase.rpc('get_unique_subjects');
+            if (subjekData) setSubjects(subjekData.map((d: any) => d.subjek));
+
+            const { data: tahunData } = await supabase.rpc('get_unique_years');
+            if (tahunData) setYears(tahunData.map((d: any) => d.tahun));
+        };
+        fetchInitialData();
+    }, []);
+
+    // Fetch SK based on subject and year
+    useEffect(() => {
+        const fetchSK = async () => {
+            if (!formData.subjek || selectedYear === '') {
+                setAvailableSK([]);
+                return;
+            }
+
+            const { data } = await supabase
+                .from('referensi_rph')
+                .select('sk')
+                .eq('subjek', formData.subjek)
+                .eq('tahun', selectedYear)
+                .order('sk', { ascending: true });
+
+            if (data) {
+                setAvailableSK([...new Set(data.map(d => d.sk))].sort());
+            }
+        };
+
+        fetchSK();
     }, [formData.subjek, selectedYear]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
