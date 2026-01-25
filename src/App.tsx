@@ -220,6 +220,10 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key`}
             <RPHForm
               key="form"
               onSubmit={handleSubmit}
+              onCancel={() => {
+                setEditingRecord(null);
+                setActiveTab('records');
+              }}
               initialData={editingRecord || undefined}
             />
           ) : activeTab === 'records' ? (

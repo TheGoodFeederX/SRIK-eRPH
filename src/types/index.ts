@@ -6,6 +6,7 @@ export interface RPHRecord {
     masa: string;
     subjek: string;
     tajukStandardKandungan: string;
+    objektif: string;
     aktiviti: string;
     refleksi: string;
 }

@@ -50,6 +50,11 @@ export const RPHPrintLayout: React.FC<RPHPrintLayoutProps> = ({ record, showPage
                 </div>
 
                 <div style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
+                    <strong>Objektif:</strong>
+                    <div style={{ marginTop: '0.15rem', whiteSpace: 'pre-wrap' }}>{record.objektif}</div>
+                </div>
+
+                <div style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
                     <strong>Aktiviti:</strong>
                     <div style={{ marginTop: '0.15rem', whiteSpace: 'pre-wrap', minHeight: '80px' }}>{record.aktiviti}</div>
                 </div>

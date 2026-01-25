@@ -31,6 +31,7 @@ export const useRecords = () => {
                 masa: rec.masa,
                 subjek: rec.subjek,
                 tajukStandardKandungan: rec.tajuk_standard_kandungan,
+                objektif: rec.objektif,
                 aktiviti: rec.aktiviti,
                 refleksi: rec.refleksi
             }));
@@ -54,6 +55,7 @@ export const useRecords = () => {
             masa: record.masa,
             subjek: record.subjek,
             tajuk_standard_kandungan: record.tajukStandardKandungan,
+            objektif: record.objektif,
             aktiviti: record.aktiviti,
             refleksi: record.refleksi
         };
@@ -78,6 +80,7 @@ export const useRecords = () => {
         if (record.masa) dbRecord.masa = record.masa;
         if (record.subjek) dbRecord.subjek = record.subjek;
         if (record.tajukStandardKandungan) dbRecord.tajuk_standard_kandungan = record.tajukStandardKandungan;
+        if (record.objektif) dbRecord.objektif = record.objektif;
         if (record.aktiviti) dbRecord.aktiviti = record.aktiviti;
         if (record.refleksi) dbRecord.refleksi = record.refleksi;
 

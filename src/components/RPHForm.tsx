@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Save, RefreshCw, Download, ChevronDown, X, Printer } from 'lucide-react';
+import { Save, RefreshCw, Download, ChevronDown, X, Printer, ArrowLeft } from 'lucide-react';
 import type { RPHRecord } from '../types';
 import referenceData from '../erph_data.json';
 // @ts-ignore
@@ -17,6 +17,7 @@ const DATA: ExcelRow[] = referenceData as ExcelRow[];
 
 interface RPHFormProps {
     onSubmit: (record: Omit<RPHRecord, 'id'>) => void;
+    onCancel?: () => void;
     initialData?: RPHRecord;
 }
 
@@ -53,7 +54,7 @@ const getMalayDay = (dateString: string) => {
     return days[date.getDay()];
 };
 
-export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, initialData }) => {
+export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialData }) => {
     const initialDate = initialData?.tarikh || new Date().toISOString().split('T')[0];
     const [formData, setFormData] = useState<Omit<RPHRecord, 'id'>>({
         tarikh: initialDate,
@@ -62,6 +63,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, initialData }) => {
         masa: initialData?.masa || '',
         subjek: initialData?.subjek || '',
         tajukStandardKandungan: initialData?.tajukStandardKandungan || '',
+        objektif: initialData?.objektif || '',
         aktiviti: initialData?.aktiviti || '',
         refleksi: initialData?.refleksi || '',
     });
@@ -163,6 +165,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, initialData }) => {
                 masa: '',
                 subjek: '',
                 tajukStandardKandungan: '',
+                objektif: '',
                 aktiviti: '',
                 refleksi: '',
             });
@@ -414,13 +417,18 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, initialData }) => {
                 </div>
 
                 <div className="input-group">
+                    <label htmlFor="objektif">Objektif</label>
+                    <textarea id="objektif" name="objektif" value={formData.objektif} onChange={handleChange} rows={3} required />
+                </div>
+
+                <div className="input-group">
                     <label htmlFor="aktiviti">Aktiviti</label>
                     <textarea id="aktiviti" name="aktiviti" value={formData.aktiviti} onChange={handleChange} rows={4} required />
                 </div>
 
                 <div className="input-group">
-                    <label htmlFor="refleksi">Refleksi</label>
-                    <textarea id="refleksi" name="refleksi" value={formData.refleksi} onChange={handleChange} rows={2} required />
+                    <label htmlFor="refleksi">Refleksi (Opsional)</label>
+                    <textarea id="refleksi" name="refleksi" value={formData.refleksi} onChange={handleChange} rows={2} />
                 </div>
 
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
@@ -430,6 +438,11 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, initialData }) => {
                     <button type="button" className="btn btn-outline" onClick={handleShowPreview} title="Pratonton & Muat Turun">
                         <Printer size={18} /> Pratonton
                     </button>
+                    {onCancel && (
+                        <button type="button" className="btn btn-outline" onClick={onCancel}>
+                            <ArrowLeft size={18} /> Kembali
+                        </button>
+                    )}
                     {!initialData && (
                         <button type="button" className="btn btn-outline" onClick={() => {
                             const today = new Date().toISOString().split('T')[0];
@@ -440,6 +453,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, initialData }) => {
                                 masa: '',
                                 subjek: '',
                                 tajukStandardKandungan: '',
+                                objektif: '',
                                 aktiviti: '',
                                 refleksi: '',
                             });

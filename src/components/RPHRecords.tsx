@@ -85,9 +85,9 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
         };
 
         // Make element visible and properly positioned for html2canvas
-        // Position it on-screen but behind everything (z-index: -1) for rendering
+        // Position it far off-screen but still visible to the DOM for rendering
         element.style.position = 'fixed';
-        element.style.left = '0px';
+        element.style.left = '-10000px';
         element.style.top = '0px';
         element.style.width = '210mm'; // A4 width
         element.style.maxWidth = '210mm';
