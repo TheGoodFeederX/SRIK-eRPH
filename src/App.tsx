@@ -3,7 +3,6 @@ import { useRecords } from './hooks/useRecords';
 import { RPHForm } from './components/RPHForm';
 import { RPHRecords } from './components/RPHRecords';
 import { DSKPManager } from './components/DSKPManager';
-import { PrintPreview } from './components/PrintPreview';
 import type { Tab, RPHRecord } from './types';
 import { List, PlusCircle, LogOut, Settings as SettingsIcon, Database } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -17,7 +16,6 @@ function AppContent() {
   const { records, loading, addRecord, updateRecord, deleteRecord } = useRecords();
   const [activeTab, setActiveTab] = useState<Tab>('form');
   const [editingRecord, setEditingRecord] = useState<RPHRecord | null>(null);
-  const [printingRecord, setPrintingRecord] = useState<RPHRecord | null>(null);
 
   if (!hasCredentials) {
     return (
@@ -81,7 +79,7 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key`}
           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
           maxWidth: '600px'
         }}>
-          <h2 style={{ color: '#dc2626', marginBottom: '1rem' }}>⚠️ Connection Error</h2>
+          <h2 style={{ color: '#dc2626', marginBottom: '1rem' }}>⚠️ Sambungan gagal.</h2>
           <p style={{ color: '#991b1b', marginBottom: '1rem' }}>
             {connectionError}
           </p>
@@ -99,7 +97,7 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key`}
         <div style={{ textAlign: 'center' }}>
           <p style={{ marginBottom: '0.5rem' }}>Memuatkan...</p>
           {connectionStatus === 'checking' && (
-            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Testing Supabase connection...</p>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Menyemak sambungan...</p>
           )}
         </div>
       </div>
@@ -128,52 +126,90 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key`}
 
   return (
     <div className="container">
-      <header style={{ marginBottom: '3rem', textAlign: 'center', position: 'relative' }} className="no-print">
-        <div style={{ position: 'absolute', right: 0, top: 0 }}>
+      <header style={{ marginBottom: '2rem', textAlign: 'center', position: 'relative' }} className="no-print">
+        <div style={{
+          position: 'absolute',
+          right: '-0.5rem',
+          top: '-0.5rem',
+          zIndex: 10
+        }}>
           <button
             onClick={signOut}
+            title="Log Keluar"
+            className="logout-btn"
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.5rem 1rem',
+              justifyContent: 'center',
+              width: '40px',
+              height: '40px',
               backgroundColor: '#fee2e2',
               color: '#991b1b',
               border: 'none',
-              borderRadius: '0.5rem',
+              borderRadius: '50%',
               cursor: 'pointer',
-              fontSize: '0.875rem',
-              fontWeight: 600
+              transition: 'all 0.2s',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#fecaca';
+              e.currentTarget.style.transform = 'scale(1.05)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#fee2e2';
+              e.currentTarget.style.transform = 'scale(1)';
             }}
           >
-            <LogOut size={16} /> Log Keluar
+            <LogOut size={18} />
+            <span className="logout-text" style={{ fontWeight: 600, fontSize: '0.875rem' }}>Log Keluar</span>
           </button>
         </div>
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '1.25rem', marginBottom: '0.5rem' }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '1rem', marginBottom: '0.25rem' }}
         >
-          <div style={{ backgroundColor: 'white', padding: '0.5rem', borderRadius: '1rem', boxShadow: 'var(--shadow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img src="/logo.png" alt="Logo SRI Al-Khairiah" style={{ width: '60px', height: '60px', objectFit: 'contain' }} />
+          <div style={{ backgroundColor: 'white', padding: '0.4rem', borderRadius: '0.75rem', boxShadow: 'var(--shadow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img src="/logo.png" alt="Logo SRI Al-Khairiah" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
           </div>
-          <h1 style={{ fontSize: '2.25rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.025em', textAlign: 'left' }}>
-            eRPH <span style={{ color: 'var(--primary)' }}>SRI Al-Khairiah</span>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.025em', textAlign: 'left', lineHeight: 1.1 }}>
+            eRPH <span style={{ color: 'var(--primary)', display: 'block', fontSize: '0.9rem', fontWeight: 600 }}>SRI Al-Khairiah</span>
           </h1>
         </motion.div>
-        <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>Rekod Pengajaran Harian Digital</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Aplikasi Rekod Pengajaran Harian</p>
+
+        {/* Desktop Title Layout (Hidden on mobile via simple JS or CSS if needed, but let's make it responsive) */}
+        <style>{`
+          @media (min-width: 768px) {
+            header { margin-bottom: 3.5rem !important; }
+            h1 { fontSize: 2.25rem !important; lineHeight: 1.2 !important; }
+            h1 span { display: inline !important; fontSize: inherit !important; }
+            img { width: 60px !important; height: 60px !important; }
+            header p { fontSize: 1.1rem !important; }
+            .logout-btn { 
+              padding: 0.5rem 1rem !important; 
+              width: auto !important; 
+              height: auto !important; 
+              border-radius: 0.5rem !important;
+              gap: 0.5rem;
+            }
+            .logout-text { display: inline !important; }
+          }
+          .logout-text { display: none; }
+        `}</style>
+
         {user && (
           <motion.p
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             style={{
               color: 'var(--primary)',
-              fontSize: '1rem',
+              fontSize: '0.9rem',
               fontWeight: 600,
-              marginTop: '1rem'
+              marginTop: '0.75rem'
             }}
           >
-            Selamat Kembali, {user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Pengguna'}.
+            Hai, {user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Cikgu'}.
           </motion.p>
         )}
       </header>
@@ -233,7 +269,6 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key`}
               loading={loading}
               onDelete={deleteRecord}
               onEdit={handleEdit}
-              onPrint={setPrintingRecord}
             />
           ) : activeTab === 'dskp' ? (
             <DSKPManager key="dskp" />
@@ -243,14 +278,7 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key`}
         </AnimatePresence>
       </main>
 
-      <AnimatePresence>
-        {printingRecord && (
-          <PrintPreview
-            record={printingRecord}
-            onClose={() => setPrintingRecord(null)}
-          />
-        )}
-      </AnimatePresence>
+      {/* PDF Functionality Removed */}
 
       <footer style={{ marginTop: '4rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }} className="no-print">
         &copy; {new Date().getFullYear()} eRPH SRI Al-Khairiah. Dibina oleh Cikgu Najmi. Hak Cipta Terpelihara.

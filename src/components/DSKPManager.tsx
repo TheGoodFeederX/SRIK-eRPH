@@ -4,7 +4,7 @@ import { type ReferensiRPH } from '../types';
 import {
     Plus, Search, Edit2, Trash2, X, Save, AlertCircle,
     ChevronLeft, ChevronRight, Loader2, CheckCircle2,
-    Database, Inbox, Filter
+    Inbox, Filter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -74,15 +74,35 @@ export const DSKPManager: React.FC = () => {
     const fetchRecords = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
-                .from('referensi_rph')
-                .select('*')
-                .order('subjek', { ascending: true })
-                .order('tahun', { ascending: true })
-                .order('sk', { ascending: true });
+            let allData: ReferensiRPH[] = [];
+            let from = 0;
+            const step = 1000;
+            let more = true;
 
-            if (error) throw error;
-            setRecords(data || []);
+            while (more) {
+                const { data, error } = await supabase
+                    .from('referensi_rph')
+                    .select('*')
+                    .order('subjek', { ascending: true })
+                    .order('tahun', { ascending: true })
+                    .order('sk', { ascending: true })
+                    .range(from, from + step - 1);
+
+                if (error) throw error;
+
+                if (data) {
+                    allData = [...allData, ...data];
+                    if (data.length < step) {
+                        more = false;
+                    } else {
+                        from += step;
+                    }
+                } else {
+                    more = false;
+                }
+            }
+
+            setRecords(allData);
         } catch (error) {
             console.error('Error fetching records:', error);
             addToast('Gagal memuat turun rekod DSKP.', 'error');
@@ -149,12 +169,17 @@ export const DSKPManager: React.FC = () => {
         if (!recordToDelete) return;
 
         try {
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('referensi_rph')
                 .delete()
-                .eq('id', recordToDelete.id);
+                .eq('id', recordToDelete.id)
+                .select();
 
             if (error) throw error;
+
+            if (!data || data.length === 0) {
+                throw new Error('Rekod tidak dapat dipadam. Sila pastikan anda mempunyai kebenaran.');
+            }
 
             await fetchRecords();
             setRecordToDelete(null);
@@ -201,18 +226,18 @@ export const DSKPManager: React.FC = () => {
             <div className="glass-card" style={{ padding: '2.5rem', borderRadius: '1.25rem' }}>
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
                     <div>
-                        <h2 style={{
+                        <h2 className="dskp-title" style={{
                             fontSize: '2rem',
                             fontWeight: 800,
                             color: 'var(--primary)',
-                            marginBottom: '0.5rem',
+                            marginBottom: '0.25rem',
                             letterSpacing: '-0.025em'
                         }}>
                             Pengurusan DSKP
                         </h2>
                         <p style={{
                             color: 'var(--text-muted)',
-                            fontSize: '1.05rem',
+                            fontSize: '1rem',
                             fontWeight: 500
                         }}>
                             Urus Subjek dan Standard Kandungan
@@ -225,6 +250,7 @@ export const DSKPManager: React.FC = () => {
                             setIsAddingNewTahun(false);
                             setIsAddModalOpen(true);
                         }}
+                        className="btn btn-primary dskp-add-btn"
                         style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -238,31 +264,23 @@ export const DSKPManager: React.FC = () => {
                             fontSize: '1rem',
                             cursor: 'pointer',
                             boxShadow: '0 4px 12px rgba(20, 133, 63, 0.2)',
-                            transition: 'all 0.2s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = '0 8px 20px rgba(20, 133, 63, 0.3)';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(20, 133, 63, 0.2)';
+                            transition: 'all 0.2s ease',
+                            width: 'auto'
                         }}
                     >
-                        <Plus size={20} /> Tambah Rekod
+                        <Plus size={20} /> <span className="btn-text">Tambah Rekod</span>
                     </button>
                 </div>
 
-                <div style={{
+                <div className="dskp-filters" style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                    gap: '1.25rem',
-                    marginBottom: '2.5rem',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: '1rem',
+                    marginBottom: '2rem',
                     backgroundColor: '#f8fafc',
-                    padding: '1.75rem',
+                    padding: '1.25rem',
                     borderRadius: '1rem',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
+                    border: '1px solid #e2e8f0'
                 }}>
                     <div>
                         <label style={{
@@ -405,15 +423,16 @@ export const DSKPManager: React.FC = () => {
                     </div>
                 </div>
 
-                <div style={{
-                    borderRadius: '1rem',
+                <div className="table-wrapper" style={{
+                    borderRadius: '0.75rem',
                     border: '1px solid #e2e8f0',
-                    overflow: 'hidden',
-                    minHeight: '500px',
+                    overflowX: 'auto',
+                    minHeight: '400px',
                     backgroundColor: 'white',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                    scrollbarWidth: 'thin'
                 }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
                         <thead>
                             <tr style={{
                                 backgroundColor: '#f8fafc',
@@ -622,22 +641,22 @@ export const DSKPManager: React.FC = () => {
                 </div>
 
                 {!loading && filteredRecords.length > 0 && (
-                    <div style={{
+                    <div className="pagination-container" style={{
                         display: 'flex',
                         flexDirection: 'row',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        gap: '1.5rem',
-                        marginTop: '2rem',
-                        paddingTop: '1.5rem',
+                        gap: '1rem',
+                        marginTop: '1.5rem',
+                        paddingTop: '1rem',
                         borderTop: '1px solid #e2e8f0',
                         flexWrap: 'wrap'
                     }}>
-                        <div style={{
+                        <div className="pagination-info" style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '0.75rem',
-                            fontSize: '0.95rem',
+                            gap: '0.5rem',
+                            fontSize: '0.875rem',
                             color: '#64748b',
                             fontWeight: 500
                         }}>
@@ -647,97 +666,95 @@ export const DSKPManager: React.FC = () => {
                                 onChange={(e) => setItemsPerPage(Number(e.target.value))}
                                 style={{
                                     border: '1.5px solid #e2e8f0',
-                                    borderRadius: '0.625rem',
-                                    padding: '0.5rem 0.75rem',
+                                    borderRadius: '0.5rem',
+                                    padding: '0.35rem 0.5rem',
                                     outline: 'none',
                                     backgroundColor: 'white',
                                     cursor: 'pointer',
                                     fontWeight: 600,
                                     color: '#475569',
-                                    fontSize: '0.9rem'
+                                    fontSize: '0.875rem'
                                 }}
                             >
                                 <option value={10}>10</option>
                                 <option value={50}>50</option>
                                 <option value={100}>100</option>
                             </select>
-                            <span>dari <strong style={{ color: '#0f172a' }}>{filteredRecords.length}</strong> rekod</span>
+                            <span className="info-text">dari <strong>{filteredRecords.length}</strong> rekod</span>
                         </div>
 
-                        <div style={{
+                        <div className="pagination-controls" style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '0.75rem'
+                            gap: '0.5rem'
                         }}>
                             <button
                                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                                 disabled={currentPage === 1}
+                                className="btn-nav"
                                 style={{
-                                    padding: '0.625rem',
-                                    borderRadius: '0.625rem',
+                                    padding: '0.5rem',
+                                    borderRadius: '0.5rem',
                                     border: '1.5px solid #e2e8f0',
                                     backgroundColor: 'white',
                                     cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
                                     opacity: currentPage === 1 ? 0.5 : 1,
-                                    transition: 'all 0.2s ease',
+                                    color: '#475569',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: '#475569'
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (currentPage !== 1) {
-                                        e.currentTarget.style.backgroundColor = '#f8fafc';
-                                        e.currentTarget.style.borderColor = '#cbd5e1';
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'white';
-                                    e.currentTarget.style.borderColor = '#e2e8f0';
+                                    justifyContent: 'center'
                                 }}
                             >
-                                <ChevronLeft size={20} />
+                                <ChevronLeft size={18} />
                             </button>
-                            <span style={{
-                                fontWeight: 600,
+                            <span className="page-indicator" style={{
+                                fontWeight: 700,
                                 color: '#0f172a',
-                                fontSize: '0.95rem',
-                                padding: '0 0.5rem'
+                                fontSize: '0.875rem',
+                                padding: '0 0.25rem'
                             }}>
-                                Halaman {currentPage} / {totalPages || 1}
+                                {currentPage} / {totalPages || 1}
                             </span>
                             <button
                                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                                 disabled={currentPage === totalPages || totalPages === 0}
+                                className="btn-nav"
                                 style={{
-                                    padding: '0.625rem',
-                                    borderRadius: '0.625rem',
+                                    padding: '0.5rem',
+                                    borderRadius: '0.5rem',
                                     border: '1.5px solid #e2e8f0',
                                     backgroundColor: 'white',
                                     cursor: (currentPage === totalPages || totalPages === 0) ? 'not-allowed' : 'pointer',
                                     opacity: (currentPage === totalPages || totalPages === 0) ? 0.5 : 1,
-                                    transition: 'all 0.2s ease',
+                                    color: '#475569',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: '#475569'
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (currentPage !== totalPages && totalPages !== 0) {
-                                        e.currentTarget.style.backgroundColor = '#f8fafc';
-                                        e.currentTarget.style.borderColor = '#cbd5e1';
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'white';
-                                    e.currentTarget.style.borderColor = '#e2e8f0';
+                                    justifyContent: 'center'
                                 }}
                             >
-                                <ChevronRight size={20} />
+                                <ChevronRight size={18} />
                             </button>
                         </div>
                     </div>
                 )}
+
+                <style>{`
+                    @media (max-width: 767px) {
+                        .dskp-title { font-size: 1.5rem !important; }
+                        .dskp-add-btn { width: 100% !important; justify-content: center !important; }
+                        .pagination-container { justify-content: center !important; padding-bottom: 1rem; }
+                        .info-text { display: none; }
+                        .pagination-info { width: 100%; justify-content: center; }
+                        .btn-text { display: none; }
+                        .dskp-add-btn .btn-text { display: inline; }
+                    }
+                    @media (min-width: 768px) {
+                        .dskp-filters { grid-template-columns: repeat(3, 1fr) !important; gap: 1.5rem !important; padding: 1.75rem !important; }
+                        .pagination-info { font-size: 0.95rem !important; }
+                        .pagination-container { padding-top: 1.5rem !important; }
+                        .btn-nav { padding: 0.625rem !important; }
+                    }
+                `}</style>
             </div>
 
             {/* Modal for Add/Edit */}

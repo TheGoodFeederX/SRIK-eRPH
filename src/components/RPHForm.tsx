@@ -1,11 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Save, RefreshCw, Download, ChevronDown, X, Printer, ArrowLeft } from 'lucide-react';
+import { Save, RefreshCw, ChevronDown, X, ArrowLeft } from 'lucide-react';
 import type { RPHRecord } from '../types';
 import { supabase } from '../lib/supabaseClient';
-// @ts-ignore
-import html2pdf from 'html2pdf.js';
-import { RPHPrintLayout } from './RPHPrintLayout';
 
 interface RPHFormProps {
     onSubmit: (record: Omit<RPHRecord, 'id'>) => void;
@@ -73,7 +70,6 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
     });
     const [isMasaDropdownOpen, setIsMasaDropdownOpen] = useState(false);
     const masaDropdownRef = useRef<HTMLDivElement>(null);
-    const [showPrintModal, setShowPrintModal] = useState(false);
 
     // Fetch initial data for Subjects and Years
     useEffect(() => {
@@ -147,29 +143,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
         };
     }, [isMasaDropdownOpen]);
 
-    const handlePrint = () => {
-        window.print();
-    };
-
-    const handleDownloadPDF = () => {
-        const element = document.getElementById('form-print-modal-area');
-        if (!element) return;
-
-        const opt = {
-            margin: 0,
-            filename: `eRPH_${formData.tarikh}_${formData.kelas.replace(/ /g, '_') || 'rekod'}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true },
-            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-        } as any;
-
-        html2pdf().set(opt).from(element).save();
-    };
-
-    const handleShowPreview = () => {
-        setShowPrintModal(true);
-    };
-
+    // PDF Functionality Removed
     const handleSubmit = (e: React.FormEvent) => {
 
         e.preventDefault();
@@ -196,7 +170,6 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="glass-card"
-            style={{ padding: '2rem' }}
         >
             <h2 style={{ marginBottom: '1.5rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Save size={24} /> {initialData ? 'Kemaskini Rekod' : 'Rekod Pengajaran Harian Baru'}
@@ -449,15 +422,17 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                     <textarea id="refleksi" name="refleksi" value={formData.refleksi} onChange={handleChange} rows={2} />
                 </div>
 
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                    <button type="submit" className="btn btn-primary">
-                        {initialData ? 'Kemaskini' : 'Simpan Rekod'}
-                    </button>
-                    <button type="button" className="btn btn-outline" onClick={handleShowPreview} title="Pratonton & Muat Turun">
-                        <Printer size={18} /> Pratonton
+                <div className="form-actions" style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: '0.75rem',
+                    marginTop: '1.5rem'
+                }}>
+                    <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+                        {initialData ? 'Kemaskini' : 'Simpan'}
                     </button>
                     {onCancel && (
-                        <button type="button" className="btn btn-outline" onClick={onCancel}>
+                        <button type="button" className="btn btn-outline" onClick={onCancel} style={{ width: '100%', justifyContent: 'center' }}>
                             <ArrowLeft size={18} /> Kembali
                         </button>
                     )}
@@ -476,53 +451,27 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                                 refleksi: '',
                             });
                             setSelectedMasa([]);
-                        }}>
+                        }} style={{ width: '100%', justifyContent: 'center' }}>
                             <RefreshCw size={18} /> Semula
                         </button>
                     )}
+
+                    <style>{`
+                        @media (min-width: 768px) {
+                            .form-actions {
+                                display: flex !important;
+                                grid-template-columns: none !important;
+                                gap: 1rem !important;
+                            }
+                            .form-actions .btn {
+                                width: auto !important;
+                            }
+                        }
+                    `}</style>
                 </div>
             </form>
 
-            {/* Print Preview Modal - exactly like PrintPreview */}
-            {showPrintModal && (
-                <div className="print-preview-backdrop" style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000,
-                    padding: '1rem'
-                }}>
-                    <div className="glass-card print-preview-modal" style={{
-                        backgroundColor: 'white',
-                        width: '100%',
-                        maxWidth: '800px',
-                        maxHeight: '90vh',
-                        overflowY: 'auto',
-                        padding: '2rem',
-                        position: 'relative'
-                    }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem' }} className="no-print">
-                            <button className="btn btn-outline" onClick={() => setShowPrintModal(false)}><X size={18} /> Tutup</button>
-                            <div style={{ display: 'flex', gap: '0.75rem' }}>
-                                <button className="btn btn-outline" onClick={handleDownloadPDF} title="Muat Turun (PDF)">
-                                    <Download size={18} /> Muat Turun PDF
-                                </button>
-                                <button className="btn btn-primary" onClick={handlePrint}><Printer size={18} /> Cetak</button>
-                            </div>
-                        </div>
-
-                        <div id="form-print-modal-area" className="print-content">
-                            <RPHPrintLayout record={{ ...formData, id: 'temp' }} minHeight="10in" />
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* PDF Functionality Removed */}
         </motion.div>
     );
 };
