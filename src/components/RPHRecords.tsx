@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Edit2, Trash2, Search, Loader2, Download } from 'lucide-react';
+import { Edit2, Trash2, Search, Loader2, Download, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { RPHRecord } from '../types';
 import * as XLSX from 'xlsx';
+import { generateSinglePDF, generateBulkPDF } from '../utils/pdfGenerator';
 
 interface RPHRecordsProps {
     records: RPHRecord[];
@@ -64,15 +65,31 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
                     <h2 style={{ color: 'var(--primary)', margin: 0 }}>Senarai Rekod</h2>
 
                     <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', width: '100%', justifyContent: 'space-between' }} className="records-actions">
-                        <button
-                            className="btn btn-outline"
-                            onClick={handleDownloadAll}
-                            disabled={filteredRecords.length === 0}
-                            title="Muat Turun Semua (Excel)"
-                            style={{ flexShrink: 0 }}
-                        >
-                            <Download size={18} /> <span className="btn-text">Excel</span>
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button
+                                className="btn btn-outline"
+                                onClick={handleDownloadAll}
+                                disabled={filteredRecords.length === 0}
+                                title="Muat Turun Semua (Excel)"
+                                style={{ flexShrink: 0 }}
+                            >
+                                <Download size={18} /> <span className="btn-text">Excel</span>
+                            </button>
+                            <button
+                                className="btn btn-outline"
+                                onClick={async () => {
+                                    const recordsToPrint = selectedIds.length > 0
+                                        ? records.filter(r => selectedIds.includes(r.id))
+                                        : filteredRecords;
+                                    await generateBulkPDF(recordsToPrint);
+                                }}
+                                disabled={filteredRecords.length === 0}
+                                title={selectedIds.length > 0 ? "Muat Turun Pilihan (PDF)" : "Muat Turun Semua (PDF)"}
+                                style={{ flexShrink: 0 }}
+                            >
+                                <FileText size={18} /> <span className="btn-text">PDF</span>
+                            </button>
+                        </div>
                         <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
                             <Search style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
                             <input
@@ -154,6 +171,9 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
                                             </td>
                                             <td className="no-print">
                                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                    <button className="btn btn-outline" style={{ padding: '0.5rem' }} title="Cetak PDF" onClick={async () => await generateSinglePDF(rec)}>
+                                                        <FileText size={16} />
+                                                    </button>
                                                     <button className="btn btn-outline" style={{ padding: '0.5rem' }} title="Edit" onClick={() => onEdit(rec)}>
                                                         <Edit2 size={16} />
                                                     </button>

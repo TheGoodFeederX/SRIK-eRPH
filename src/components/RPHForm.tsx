@@ -59,7 +59,13 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
 
     const [subjects, setSubjects] = useState<string[]>([]);
     const [years, setYears] = useState<number[]>([]);
-    const [selectedYear, setSelectedYear] = useState<number | ''>('');
+    const [selectedYear, setSelectedYear] = useState<number | ''>(() => {
+        if (initialData?.kelas) {
+            const match = initialData.kelas.match(/^(\d+)/);
+            return match ? parseInt(match[1]) : '';
+        }
+        return '';
+    });
     const [availableSK, setAvailableSK] = useState<string[]>([]);
     // Track selected masa values for checkbox dropdown
     const [selectedMasa, setSelectedMasa] = useState<string[]>(() => {
