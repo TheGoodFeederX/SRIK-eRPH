@@ -1,3 +1,5 @@
+@import "@fontsource/noto-sans-arabic/400.css";
+@import "@fontsource/noto-sans-arabic/700.css";
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
 
 :root {
@@ -242,6 +244,10 @@ tr:hover td {
 .font-bold { font-weight: 700; }
 .font-black { font-weight: 900; }
 
+.font-jawi {
+  font-family: 'Noto Sans Arabic', sans-serif;
+}
+
 .rounded-xl { border-radius: 0.75rem; }
 .rounded-2xl { border-radius: 1rem; }
 .rounded-3xl { border-radius: 1.5rem; }
@@ -310,8 +316,19 @@ tr:hover td {
   }
 
   .glass-card {
-    box-shadow: none;
-    border: none;
-    background: white;
+    box-shadow: none !important;
+    border: none !important;
+    background: white !important;
+  }
+
+  .print-record-container {
+    width: 210mm;
+    height: 297mm;
+    margin: 0 !important;
+    padding: 2.5rem !important;
+    border: none !important;
+    background: white !important;
+    box-shadow: none !important;
+    page-break-after: always;
   }
 }
