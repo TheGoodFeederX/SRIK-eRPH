@@ -4,7 +4,7 @@
 The project is a digital lesson planner (ERPH) for Malaysian teachers. A baseline application exists with Supabase integration, but it requires significant improvements in schema flexibility, performance, and Jawi character support.
 
 ## Active Phase
-- **Phase 3**: Jawi & PDF Excellence (Planning Stage).
+- **Phase 4**: Polish & Launch (Planning Stage).
 
 ## Completed Milestones
 - [x] Codebase mapping completed.
@@ -12,10 +12,11 @@ The project is a digital lesson planner (ERPH) for Malaysian teachers. A baselin
 - [x] Initial project documentation created.
 - [x] Phase 1: Foundation & Data Integrity (All plans completed).
 - [x] Phase 2: UX & Performance Optimization (All plans completed).
+- [x] Phase 3: Jawi & PDF Excellence (All plans completed).
 
 ## Known Risks & Issues
-- **Jawi Ligatures in PDF**: While fonts are integrated in the UI, PDF generation (jspdf/html2canvas) may still struggle with complex Arabic ligatures. This is the primary focus of Phase 3.
+- **Mobile PDF Download**: Some mobile browsers might block automatic downloads of blob-based PDFs. Testing required on actual devices.
 
 ## Next Step
-Execute Phase 3 research and planning.
+Execute Phase 4 research and planning.
 

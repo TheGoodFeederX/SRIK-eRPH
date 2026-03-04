@@ -3,7 +3,6 @@ import { useRecords } from './hooks/useRecords';
 import { RPHForm } from './components/RPHForm';
 import { RPHRecords } from './components/RPHRecords';
 import { DSKPManager } from './components/DSKPManager';
-import { PrintPreview } from './components/PrintPreview';
 import type { Tab, RPHRecord } from './types';
 import { List, PlusCircle, LogOut, Settings as SettingsIcon, Database } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -29,7 +28,6 @@ function AppContent() {
   } = useRecords();
   const [activeTab, setActiveTab] = useState<Tab>('form');
   const [editingRecord, setEditingRecord] = useState<RPHRecord | null>(null);
-  const [printingRecord, setPrintingRecord] = useState<RPHRecord | null>(null);
 
   if (!hasCredentials) {
     return (
@@ -251,7 +249,6 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key`}
               setSearchTerm={setSearchTerm}
               onDelete={deleteRecord}
               onEdit={handleEdit}
-              onPrint={setPrintingRecord}
             />
           ) : activeTab === 'dskp' ? (
             <DSKPManager key="dskp" />
@@ -260,15 +257,6 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key`}
           )}
         </AnimatePresence>
       </main>
-
-      <AnimatePresence>
-        {printingRecord && (
-          <PrintPreview
-            record={printingRecord}
-            onClose={() => setPrintingRecord(null)}
-          />
-        )}
-      </AnimatePresence>
 
       <footer style={{ marginTop: '4rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }} className="no-print">
         &copy; {new Date().getFullYear()} eRPH SRI Al-Khairiah. Dibina oleh Cikgu Najmi. Hak Cipta Terpelihara.

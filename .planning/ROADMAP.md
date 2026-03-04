@@ -12,13 +12,13 @@
 - [x] 02-02-form-wizard-PLAN.md — Streamlined, multi-step RPH creation form.
 - [x] 02-03-dskp-lookup-PLAN.md — Auto-lookup/filtering for DSKP standards based on grade/subject.
 
-## Phase 3: Jawi & PDF Excellence (Next Focus)
+## Phase 3: Jawi & PDF Excellence (COMPLETED)
 **Goal:** Perfect the output and specific subject needs.
-- [ ] Integrate Jawi reshaping logic for correct text rendering in forms.
-- [ ] Implement high-quality PDF generation with full RTL/Jawi support.
-- [ ] Create print-ready templates that match KSSR standards.
+- [x] 03-01-jawi-logic-PLAN.md — Integrate Jawi reshaping logic for correct text rendering.
+- [x] 03-02-pdf-engine-PLAN.md — Implement high-quality PDF generation with full RTL/Jawi support.
+- [x] 03-03-kssr-template-PLAN.md — Create print-ready templates that match KSSR standards.
 
-## Phase 4: Polish & Launch
+## Phase 4: Polish & Launch (Next Focus)
 **Goal:** Final verification and user-readiness.
 - [ ] User feedback loop and UI refinements.
 - [ ] Performance audit and final bug fixes.

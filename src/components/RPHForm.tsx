@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Save, ChevronDown, X, Printer, ArrowLeft, AlertCircle } from 'lucide-react';
+import { Save, ChevronDown, X, Printer, ArrowLeft, AlertCircle, Download } from 'lucide-react';
 import type { RPHRecord } from '../types';
 import { supabase } from '../lib/supabaseClient';
-// @ts-ignore
-import html2pdf from 'html2pdf.js';
 import { RPHPrintLayout } from './RPHPrintLayout';
+import { generateRPH_PDF } from '../lib/pdfGenerator';
 
 interface RPHFormProps {
     onSubmit: (record: Omit<RPHRecord, 'id'>) => Promise<void>;
@@ -82,6 +81,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
     const [isMasaDropdownOpen, setIsMasaDropdownOpen] = useState(false);
     const masaDropdownRef = useRef<HTMLDivElement>(null);
     const [showPrintModal, setShowPrintModal] = useState(false);
+    const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
     // Initial data fetch
     useEffect(() => {
@@ -344,6 +344,32 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
             ? currentMasa.filter(m => m !== masa)
             : [...currentMasa, masa];
         setFormData(prev => ({ ...prev, masa: newMasa.join(', ') }));
+    };
+
+    const handleDownloadPDF = async () => {
+        setIsGeneratingPDF(true);
+        try {
+            const recordToGenerate: RPHRecord = {
+                ...formData,
+                id: 'temp',
+                user_id: initialData?.user_id || '',
+                content: {
+                    bidang: formData.bidang,
+                    tajukStandardKandungan: formData.tajukStandardKandungan,
+                    objektif: formData.objektif,
+                    aktiviti: formData.aktiviti,
+                    refleksi: formData.refleksi,
+                    sp: formData.sp,
+                    spi: formData.spi
+                }
+            };
+            await generateRPH_PDF(recordToGenerate);
+            setIsGeneratingPDF(false);
+        } catch (error) {
+            console.error('PDF Generation Error:', error);
+            setIsGeneratingPDF(false);
+            alert('Gagal menjana PDF. Sila cuba lagi.');
+        }
     };
 
     return (
@@ -784,7 +810,12 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem' }}>
                             <button className="btn btn-outline" onClick={() => setShowPrintModal(false)}><X size={18} /> Tutup</button>
-                            <button className="btn btn-primary" onClick={() => window.print()}><Printer size={18} /> Cetak</button>
+                            <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                <button className="btn btn-outline" onClick={handleDownloadPDF} disabled={isGeneratingPDF}>
+                                    <Download size={18} /> {isGeneratingPDF ? 'Menjana...' : 'Muat Turun PDF'}
+                                </button>
+                                <button className="btn btn-primary" onClick={() => window.print()}><Printer size={18} /> Cetak</button>
+                            </div>
                         </div>
                         <RPHPrintLayout record={{ 
                             ...formData, 

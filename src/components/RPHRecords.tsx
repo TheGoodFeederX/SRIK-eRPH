@@ -3,7 +3,7 @@ import { Edit2, Trash2, Printer, Search, Loader2, Download, ChevronLeft, Chevron
 import { motion, AnimatePresence } from 'framer-motion';
 import type { RPHRecord } from '../types';
 import * as XLSX from 'xlsx';
-import { RPHPrintLayout } from './RPHPrintLayout';
+import { generateRPH_PDF, generateBulkRPH_PDF } from '../lib/pdfGenerator';
 
 interface RPHRecordsProps {
     records: RPHRecord[];
@@ -16,7 +16,6 @@ interface RPHRecordsProps {
     setSearchTerm: (term: string) => void;
     onDelete: (id: string) => void;
     onEdit: (record: RPHRecord) => void;
-    onPrint: (record: RPHRecord) => void;
 }
 
 export const RPHRecords: React.FC<RPHRecordsProps> = ({ 
@@ -29,8 +28,7 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
     searchTerm,
     setSearchTerm,
     onDelete, 
-    onEdit, 
-    onPrint 
+    onEdit 
 }) => {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -77,120 +75,21 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
         setIsGeneratingPDF(true);
 
         try {
-            // @ts-ignore
-            const { default: jsPDF } = await import('jspdf');
-            // @ts-ignore
-            const html2canvas = (await import('html2canvas')).default;
-
-            const iframe = document.createElement('iframe');
-            iframe.style.position = 'fixed';
-            iframe.style.left = '-10000px';
-            iframe.style.top = '0';
-            iframe.style.width = '210mm';
-            iframe.style.height = 'auto';
-            iframe.style.border = 'none';
-            document.body.appendChild(iframe);
-
-            const doc = iframe.contentDocument || iframe.contentWindow?.document;
-            if (!doc) throw new Error('Cannot access iframe document');
-
-            const styleSheets = Array.from(document.styleSheets);
-            const styleTagsArray = await Promise.all(styleSheets.map(async sheet => {
-                try {
-                    if (sheet.href) return `<link rel="stylesheet" href="${sheet.href}">`;
-                    if (sheet.cssRules) return `<style>${Array.from(sheet.cssRules).map(r => r.cssText).join('\n')}</style>`;
-                } catch (e) { return ''; }
-                return '';
-            }));
-
-            const fontTag = `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">`;
-            const baseStyles = `<style>
-                :root {
-                  --primary: #14853f; --secondary: #e31e24; --accent: #fde910;
-                  --background: #f8fafc; --surface: #ffffff; --text-main: #1e293b;
-                  --text-muted: #64748b; --border: #e2e8f0;
-                }
-                * { box-sizing: border-box; -webkit-print-color-adjust: exact; }
-                body { 
-                  font-family: 'Plus Jakarta Sans', sans-serif; 
-                  background: white; margin: 0; padding: 0; width: 210mm;
-                  overflow-x: hidden;
-                }
-                .print-record-container { 
-                    width: 210mm; 
-                    height: 297mm;
-                    display: flex;
-                    flex-direction: column;
-                    margin: 0 !important; 
-                    padding: 2.5rem !important;
-                    background: white;
-                    page-break-after: always;
-                    box-sizing: border-box;
-                    position: relative;
-                }
-                h1, h2, h3, p, strong { color: black !important; }
-            </style>`;
-
-            doc.open();
-            doc.write(`<html><head>${fontTag}${baseStyles}${styleTagsArray.join('\n')}</head><body><div id="capture-root"></div></body></html>`);
-            doc.close();
-
-            await new Promise(resolve => {
-                const checkFonts = () => {
-                    if (iframe.contentWindow?.document.fonts) {
-                        iframe.contentWindow.document.fonts.ready.then(resolve);
-                    } else {
-                        setTimeout(resolve, 1500);
-                    }
-                };
-                if (doc.readyState === 'complete') {
-                    checkFonts();
-                } else {
-                    iframe.onload = checkFonts;
-                }
-            });
-
-            const pdf = new jsPDF({
-                orientation: 'portrait',
-                unit: 'mm',
-                format: 'a4'
-            });
-
-            const captureRoot = doc.getElementById('capture-root')!;
-            const sourceList = document.getElementById('bulk-print-area')!;
-
-            for (let i = 0; i < selectedRecords.length; i++) {
-                const tempDiv = doc.createElement('div');
-                tempDiv.className = 'print-record-container';
-                captureRoot.appendChild(tempDiv);
-
-                if (sourceList.children[i]) {
-                    tempDiv.innerHTML = sourceList.children[i].innerHTML;
-                }
-
-                const canvas = await html2canvas(tempDiv, {
-                    scale: 2,
-                    useCORS: true,
-                    logging: false,
-                    width: 794,
-                    backgroundColor: '#ffffff',
-                    windowWidth: 794
-                });
-
-                const imgData = canvas.toDataURL('image/jpeg', 1.0);
-                const pdfWidth = pdf.internal.pageSize.getWidth();
-                const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-                if (i > 0) pdf.addPage();
-                pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-                captureRoot.removeChild(tempDiv);
-            }
-
-            pdf.save(`eRPH_Pilihan_${new Date().toISOString().split('T')[0]}.pdf`);
-            document.body.removeChild(iframe);
+            await generateBulkRPH_PDF(selectedRecords);
             setIsGeneratingPDF(false);
             setSelectedIds([]);
+        } catch (error) {
+            console.error('PDF Generation Error:', error);
+            setIsGeneratingPDF(false);
+            alert('Gagal menjana PDF. Sila cuba lagi.');
+        }
+    };
 
+    const handleSinglePrint = async (record: RPHRecord) => {
+        setIsGeneratingPDF(true);
+        try {
+            await generateRPH_PDF(record);
+            setIsGeneratingPDF(false);
         } catch (error) {
             console.error('PDF Generation Error:', error);
             setIsGeneratingPDF(false);
@@ -310,7 +209,7 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
                                                     }}>
                                                         <Trash2 size={16} />
                                                     </button>
-                                                    <button className="btn btn-primary" style={{ padding: '0.5rem' }} title="Cetak" onClick={() => onPrint(rec)}>
+                                                    <button className="btn btn-primary" style={{ padding: '0.5rem' }} title="Cetak" onClick={() => handleSinglePrint(rec)}>
                                                         <Printer size={16} />
                                                     </button>
                                                 </div>
@@ -404,16 +303,6 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
                     </motion.div>
                 )}
             </AnimatePresence>
-
-            <div id="bulk-print-area" style={{ display: 'none' }}>
-                {selectedRecords.map((rec) => (
-                    <RPHPrintLayout
-                        key={rec.id}
-                        record={rec}
-                        minHeight="297mm"
-                    />
-                ))}
-            </div>
         </React.Fragment >
     );
 };
