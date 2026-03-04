@@ -92,19 +92,12 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
 
                 const { data: tahunData } = await supabase.rpc('get_unique_years');
                 if (tahunData) setYears(tahunData.map((d: any) => d.tahun));
-                
-                // If initialData exists, try to set selectedYear
-                if (initialData?.subjek && initialData?.tarikh) {
-                    // This is a bit tricky since initialData doesn't have 'tahun' directly
-                    // We might need to infer it or just wait for user to select if not obvious
-                    // For now, let's see if we can find it from referensi_rph
-                }
             } catch (err) {
                 console.error('Error fetching metadata:', err);
             }
         };
         fetchMetadata();
-    }, [initialData]);
+    }, []);
 
     // Validation for each step
     const validateStep = (step: number) => {
@@ -191,9 +184,6 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
             if (formData.bidang) {
                 query = query.eq('bidang', formData.bidang);
             } else {
-                // If we don't have a bidang selected, but we reached here,
-                // it means either availableBidang is empty OR it's not selected.
-                // If it's empty, we should fetch all SKs for that subjek/tahun where bidang is null.
                 query = query.is('bidang', null);
             }
 
@@ -339,6 +329,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                     spi: [],
                 });
                 setSelectedYear('');
+                setCurrentStep(1);
             }
         } catch (err: any) {
             setError(err.message || 'Gagal menyimpan rekod. Sila cuba lagi.');

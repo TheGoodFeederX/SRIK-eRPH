@@ -3,24 +3,39 @@ import type { RPHRecord } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../components/AuthContext';
 
-export const useRecords = () => {
+export const useRecords = (initialPage = 0, initialPageSize = 10) => {
     const { user } = useAuth();
     const [records, setRecords] = useState<RPHRecord[]>([]);
     const [loading, setLoading] = useState(true);
+    const [totalCount, setTotalCount] = useState(0);
+    const [page, setPage] = useState(initialPage);
+    const [pageSize, setPageSize] = useState(initialPageSize);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const fetchRecords = useCallback(async () => {
         if (!user) {
             setRecords([]);
             setLoading(false);
+            setTotalCount(0);
             return;
         }
 
         setLoading(true);
-        const { data, error } = await supabase
+        const from = page * pageSize;
+        const to = from + pageSize - 1;
+
+        let query = supabase
             .from('rph_records')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('tarikh', { ascending: false });
+            .select('*', { count: 'exact' })
+            .eq('user_id', user.id);
+
+        if (searchTerm) {
+            query = query.or(`subjek.ilike.%${searchTerm}%,kelas.ilike.%${searchTerm}%,hari.ilike.%${searchTerm}%`);
+        }
+
+        const { data, error, count } = await query
+            .order('tarikh', { ascending: false })
+            .range(from, to);
 
         if (!error && data) {
             const mappedData: RPHRecord[] = data.map((rec: any) => ({
@@ -35,9 +50,10 @@ export const useRecords = () => {
                 created_at: rec.created_at
             }));
             setRecords(mappedData);
+            if (count !== null) setTotalCount(count);
         }
         setLoading(false);
-    }, [user]);
+    }, [user, page, pageSize, searchTerm]);
 
     useEffect(() => {
         fetchRecords();
@@ -110,5 +126,18 @@ export const useRecords = () => {
         }
     };
 
-    return { records, loading, addRecord, updateRecord, deleteRecord };
+    return { 
+        records, 
+        loading, 
+        totalCount, 
+        page, 
+        setPage, 
+        pageSize, 
+        setPageSize, 
+        searchTerm, 
+        setSearchTerm, 
+        addRecord, 
+        updateRecord, 
+        deleteRecord 
+    };
 };

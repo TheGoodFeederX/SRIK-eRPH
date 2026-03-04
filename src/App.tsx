@@ -14,7 +14,19 @@ import { Settings as SettingsComponent } from './components/Settings';
 function AppContent() {
   const { user, signOut, loading: authLoading, hasCredentials, connectionStatus, connectionError } = useAuth();
   console.log('AppContent: Render', { user: !!user, authLoading, connectionStatus, connectionError });
-  const { records, loading, addRecord, updateRecord, deleteRecord } = useRecords();
+  const { 
+    records, 
+    loading, 
+    totalCount, 
+    page, 
+    setPage, 
+    pageSize, 
+    searchTerm, 
+    setSearchTerm, 
+    addRecord, 
+    updateRecord, 
+    deleteRecord 
+  } = useRecords();
   const [activeTab, setActiveTab] = useState<Tab>('form');
   const [editingRecord, setEditingRecord] = useState<RPHRecord | null>(null);
   const [printingRecord, setPrintingRecord] = useState<RPHRecord | null>(null);
@@ -231,6 +243,12 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key`}
               key="records"
               records={records}
               loading={loading}
+              totalCount={totalCount}
+              page={page}
+              setPage={setPage}
+              pageSize={pageSize}
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
               onDelete={deleteRecord}
               onEdit={handleEdit}
               onPrint={setPrintingRecord}

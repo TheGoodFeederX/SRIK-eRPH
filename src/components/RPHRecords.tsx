@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Edit2, Trash2, Printer, Search, Loader2, Download } from 'lucide-react';
+import { Edit2, Trash2, Printer, Search, Loader2, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { RPHRecord } from '../types';
 import * as XLSX from 'xlsx';
@@ -8,21 +8,32 @@ import { RPHPrintLayout } from './RPHPrintLayout';
 interface RPHRecordsProps {
     records: RPHRecord[];
     loading?: boolean;
+    totalCount: number;
+    page: number;
+    setPage: (page: number) => void;
+    pageSize: number;
+    searchTerm: string;
+    setSearchTerm: (term: string) => void;
     onDelete: (id: string) => void;
     onEdit: (record: RPHRecord) => void;
     onPrint: (record: RPHRecord) => void;
 }
 
-export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDelete, onEdit, onPrint }) => {
-    const [searchTerm, setSearchTerm] = useState('');
+export const RPHRecords: React.FC<RPHRecordsProps> = ({ 
+    records, 
+    loading, 
+    totalCount,
+    page,
+    setPage,
+    pageSize,
+    searchTerm,
+    setSearchTerm,
+    onDelete, 
+    onEdit, 
+    onPrint 
+}) => {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-
-    const filteredRecords = records.filter(rec =>
-        rec.subjek.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (rec.content?.tajukStandardKandungan || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        rec.kelas.toLowerCase().includes(searchTerm.toLowerCase())
-    );
 
     const toggleSelect = (id: string) => {
         setSelectedIds(prev =>
@@ -31,15 +42,15 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
     };
 
     const toggleSelectAll = () => {
-        if (selectedIds.length === filteredRecords.length && filteredRecords.length > 0) {
+        if (selectedIds.length === records.length && records.length > 0) {
             setSelectedIds([]);
         } else {
-            setSelectedIds(filteredRecords.map(r => r.id));
+            setSelectedIds(records.map(r => r.id));
         }
     };
 
     const handleDownloadAll = () => {
-        const dataToExport = filteredRecords.map(rec => ({
+        const dataToExport = records.map(rec => ({
             'Tarikh': rec.tarikh,
             'Hari': rec.hari,
             'Kelas': rec.kelas,
@@ -53,18 +64,19 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Rekod eRPH');
-        XLSX.writeFile(workbook, `Rekod_eRPH_Semua_${new Date().toISOString().split('T')[0]}.xlsx`);
+        XLSX.writeFile(workbook, `Rekod_eRPH_Halaman_${page + 1}_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
     const isBulkPDF = selectedIds.length > 0;
     const selectedRecords = records.filter(r => selectedIds.includes(r.id));
+
+    const totalPages = Math.ceil(totalCount / pageSize);
 
     const handleDownloadPDFBulk = async () => {
         if (selectedRecords.length === 0) return;
         setIsGeneratingPDF(true);
 
         try {
-            // Import and verify libraries first
             // @ts-ignore
             const { default: jsPDF } = await import('jspdf');
             // @ts-ignore
@@ -75,14 +87,13 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
             iframe.style.left = '-10000px';
             iframe.style.top = '0';
             iframe.style.width = '210mm';
-            iframe.style.height = 'auto'; // Will expand
+            iframe.style.height = 'auto';
             iframe.style.border = 'none';
             document.body.appendChild(iframe);
 
             const doc = iframe.contentDocument || iframe.contentWindow?.document;
             if (!doc) throw new Error('Cannot access iframe document');
 
-            // Copy all styles from main document to iframe
             const styleSheets = Array.from(document.styleSheets);
             const styleTagsArray = await Promise.all(styleSheets.map(async sheet => {
                 try {
@@ -107,7 +118,7 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
                 }
                 .print-record-container { 
                     width: 210mm; 
-                    height: 297mm; /* Exact A4 height */
+                    height: 297mm;
                     display: flex;
                     flex-direction: column;
                     margin: 0 !important; 
@@ -124,7 +135,6 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
             doc.write(`<html><head>${fontTag}${baseStyles}${styleTagsArray.join('\n')}</head><body><div id="capture-root"></div></body></html>`);
             doc.close();
 
-            // Wait for iframe and fonts
             await new Promise(resolve => {
                 const checkFonts = () => {
                     if (iframe.contentWindow?.document.fonts) {
@@ -154,17 +164,15 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
                 tempDiv.className = 'print-record-container';
                 captureRoot.appendChild(tempDiv);
 
-                // Clone HTML from our hidden source
                 if (sourceList.children[i]) {
                     tempDiv.innerHTML = sourceList.children[i].innerHTML;
                 }
 
-                // Render Canvas
                 const canvas = await html2canvas(tempDiv, {
                     scale: 2,
                     useCORS: true,
                     logging: false,
-                    width: 794, // 210mm at 96dpi
+                    width: 794,
                     backgroundColor: '#ffffff',
                     windowWidth: 794
                 });
@@ -174,18 +182,14 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
                 const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
                 if (i > 0) pdf.addPage();
-
-                // Position image at top of page
                 pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-
-                // Cleanup temp div
                 captureRoot.removeChild(tempDiv);
             }
 
             pdf.save(`eRPH_Pilihan_${new Date().toISOString().split('T')[0]}.pdf`);
             document.body.removeChild(iframe);
             setIsGeneratingPDF(false);
-            setSelectedIds([]); // Reset selection
+            setSelectedIds([]);
 
         } catch (error) {
             console.error('PDF Generation Error:', error);
@@ -203,14 +207,19 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
                 style={{ padding: '2rem' }}
             >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-                    <h2 style={{ color: 'var(--primary)' }}>Senarai Rekod Pengajaran</h2>
+                    <div>
+                        <h2 style={{ color: 'var(--primary)' }}>Senarai Rekod Pengajaran</h2>
+                        <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                            Jumlah rekod: <strong>{totalCount}</strong>
+                        </p>
+                    </div>
 
                     <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                         <button
                             className="btn btn-outline"
                             onClick={isBulkPDF ? handleDownloadPDFBulk : handleDownloadAll}
-                            disabled={filteredRecords.length === 0}
-                            title={isBulkPDF ? "Muat Turun Pilihan (PDF)" : "Muat Turun Semua (Excel)"}
+                            disabled={records.length === 0}
+                            title={isBulkPDF ? "Muat Turun Pilihan (PDF)" : "Muat Turun Halaman (Excel)"}
                         >
                             <Download size={18} /> {isBulkPDF ? 'Muat Turun PDF' : 'Muat Turun Excel'}
                         </button>
@@ -218,10 +227,13 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
                             <Search style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
                             <input
                                 type="text"
-                                placeholder="Cari subjek, tajuk atau kelas..."
+                                placeholder="Cari subjek, kelas, atau hari..."
                                 style={{ paddingLeft: '2.5rem' }}
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onChange={(e) => {
+                                    setSearchTerm(e.target.value);
+                                    setPage(0);
+                                }}
                             />
                         </div>
                     </div>
@@ -234,7 +246,7 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
                                 <th style={{ width: '40px' }}>
                                     <input
                                         type="checkbox"
-                                        checked={selectedIds.length === filteredRecords.length && filteredRecords.length > 0}
+                                        checked={selectedIds.length === records.length && records.length > 0}
                                         onChange={toggleSelectAll}
                                     />
                                 </th>
@@ -245,16 +257,21 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
                             </tr>
                         </thead>
                         <tbody>
-                            <AnimatePresence>
+                            <AnimatePresence mode="popLayout">
                                 {loading ? (
-                                    <tr>
+                                    <motion.tr
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        key="loading"
+                                    >
                                         <td colSpan={5} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
                                             <Loader2 size={40} className="animate-spin" style={{ margin: '0 auto 1rem', color: 'var(--primary)' }} />
                                             <p>Memuatkan rekod...</p>
                                         </td>
-                                    </tr>
-                                ) : filteredRecords.length > 0 ? (
-                                    filteredRecords.map((rec) => (
+                                    </motion.tr>
+                                ) : records.length > 0 ? (
+                                    records.map((rec) => (
                                         <motion.tr
                                             key={rec.id}
                                             initial={{ opacity: 0 }}
@@ -301,16 +318,65 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
                                         </motion.tr>
                                     ))
                                 ) : (
-                                    <tr>
+                                    <motion.tr
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        key="empty"
+                                    >
                                         <td colSpan={5} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
                                             {searchTerm ? 'Tiada rekod padan dengan carian anda.' : 'Tiada rekod dijumpai. Sila tambah rekod baru.'}
                                         </td>
-                                    </tr>
+                                    </motion.tr>
                                 )}
                             </AnimatePresence>
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination Controls */}
+                {!loading && totalPages > 1 && (
+                    <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'center', 
+                        alignItems: 'center', 
+                        gap: '1rem', 
+                        marginTop: '2rem',
+                        paddingTop: '1rem',
+                        borderTop: '1px solid var(--border)'
+                    }}>
+                        <button 
+                            className="btn btn-outline" 
+                            style={{ padding: '0.5rem' }}
+                            onClick={() => setPage(Math.max(0, page - 1))}
+                            disabled={page === 0}
+                        >
+                            <ChevronLeft size={20} />
+                        </button>
+                        
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            {Array.from({ length: totalPages }, (_, i) => (
+                                <button
+                                    key={i}
+                                    className={`btn ${page === i ? 'btn-primary' : 'btn-outline'}`}
+                                    style={{ padding: '0.5rem 1rem', minWidth: '40px' }}
+                                    onClick={() => setPage(i)}
+                                >
+                                    {i + 1}
+                                </button>
+                            ))}
+                        </div>
+
+                        <button 
+                            className="btn btn-outline" 
+                            style={{ padding: '0.5rem' }}
+                            onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
+                            disabled={page === totalPages - 1}
+                        >
+                            <ChevronRight size={20} />
+                        </button>
+                    </div>
+                )}
             </motion.div >
 
             {/* Loading Overlay */}
@@ -339,7 +405,6 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
                 )}
             </AnimatePresence>
 
-            {/* Hidden Print Area for DOM Source */}
             <div id="bulk-print-area" style={{ display: 'none' }}>
                 {selectedRecords.map((rec) => (
                     <RPHPrintLayout
