@@ -110,13 +110,13 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key`}
     return <LoginPage />;
   }
 
-  const handleSubmit = (data: Omit<RPHRecord, 'id'>) => {
+  const handleSubmit = async (data: Omit<RPHRecord, 'id'>) => {
     if (editingRecord) {
-      updateRecord(editingRecord.id, data);
+      await updateRecord(editingRecord.id, data);
       setEditingRecord(null);
       setActiveTab('records');
     } else {
-      addRecord(data);
+      await addRecord(data);
       setActiveTab('records');
     }
   };
@@ -127,7 +127,7 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key`}
   };
 
   return (
-    <div className="container">
+    <div className="container font-jawi">
       <header style={{ marginBottom: '3rem', textAlign: 'center', position: 'relative' }} className="no-print">
         <div style={{ position: 'absolute', right: 0, top: 0 }}>
           <button

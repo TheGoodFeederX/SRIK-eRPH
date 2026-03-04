@@ -9,7 +9,10 @@ create table if not exists public.referensi_rph (
     id uuid primary key default uuid_generate_v4(),
     subjek text not null,
     tahun integer,
+    bidang text,
     sk text not null,
+    sp jsonb,
+    spi jsonb,
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -22,10 +25,7 @@ create table if not exists public.rph_records (
     kelas text not null,
     masa text not null,
     subjek text not null,
-    tajuk_standard_kandungan text not null,
-    objektif text,
-    aktiviti text not null,
-    refleksi text,
+    content jsonb not null default '{}'::jsonb,
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 

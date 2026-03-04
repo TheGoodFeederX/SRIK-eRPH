@@ -25,15 +25,14 @@ export const useRecords = () => {
         if (!error && data) {
             const mappedData: RPHRecord[] = data.map((rec: any) => ({
                 id: rec.id,
+                user_id: rec.user_id,
                 tarikh: rec.tarikh,
                 hari: rec.hari,
                 kelas: rec.kelas,
                 masa: rec.masa,
                 subjek: rec.subjek,
-                tajukStandardKandungan: rec.tajuk_standard_kandungan,
-                objektif: rec.objektif,
-                aktiviti: rec.aktiviti,
-                refleksi: rec.refleksi
+                content: rec.content || {},
+                created_at: rec.created_at
             }));
             setRecords(mappedData);
         }
@@ -45,7 +44,7 @@ export const useRecords = () => {
     }, [fetchRecords]);
 
     const addRecord = async (record: Omit<RPHRecord, 'id'>) => {
-        if (!user) return;
+        if (!user) throw new Error('User not authenticated');
 
         const dbRecord = {
             user_id: user.id,
@@ -54,10 +53,7 @@ export const useRecords = () => {
             kelas: record.kelas,
             masa: record.masa,
             subjek: record.subjek,
-            tajuk_standard_kandungan: record.tajukStandardKandungan,
-            objektif: record.objektif,
-            aktiviti: record.aktiviti,
-            refleksi: record.refleksi
+            content: record.content
         };
 
         const { data, error } = await supabase
@@ -65,13 +61,18 @@ export const useRecords = () => {
             .insert([dbRecord])
             .select();
 
-        if (!error && data) {
-            fetchRecords();
+        if (error) {
+            console.error('Supabase insert error:', error);
+            throw new Error(error.message);
+        }
+        
+        if (data) {
+            await fetchRecords();
         }
     };
 
     const updateRecord = async (id: string, record: Partial<RPHRecord>) => {
-        if (!user) return;
+        if (!user) throw new Error('User not authenticated');
 
         const dbRecord: any = {};
         if (record.tarikh) dbRecord.tarikh = record.tarikh;
@@ -79,10 +80,7 @@ export const useRecords = () => {
         if (record.kelas) dbRecord.kelas = record.kelas;
         if (record.masa) dbRecord.masa = record.masa;
         if (record.subjek) dbRecord.subjek = record.subjek;
-        if (record.tajukStandardKandungan) dbRecord.tajuk_standard_kandungan = record.tajukStandardKandungan;
-        if (record.objektif) dbRecord.objektif = record.objektif;
-        if (record.aktiviti) dbRecord.aktiviti = record.aktiviti;
-        if (record.refleksi) dbRecord.refleksi = record.refleksi;
+        if (record.content) dbRecord.content = record.content;
 
         const { error } = await supabase
             .from('rph_records')
@@ -90,9 +88,12 @@ export const useRecords = () => {
             .eq('id', id)
             .eq('user_id', user.id);
 
-        if (!error) {
-            fetchRecords();
+        if (error) {
+            console.error('Supabase update error:', error);
+            throw new Error(error.message);
         }
+        
+        await fetchRecords();
     };
 
     const deleteRecord = async (id: string) => {

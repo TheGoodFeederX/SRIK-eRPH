@@ -3,24 +3,20 @@ import type { RPHRecord } from '../types';
 
 interface RPHPrintLayoutProps {
     record: RPHRecord;
-    showPageBreak?: boolean;
     minHeight?: string;
 }
 
-export const RPHPrintLayout: React.FC<RPHPrintLayoutProps> = ({ record, showPageBreak, minHeight = '4.5in' }) => {
+export const RPHPrintLayout: React.FC<RPHPrintLayoutProps> = ({ record, minHeight = '4.5in' }) => {
     return (
         <div
             className="print-record-container"
             style={{
-                border: '2px solid #000',
-                padding: '2rem',
-                marginBottom: showPageBreak ? '2rem' : '0',
-                pageBreakAfter: showPageBreak ? 'always' : 'auto',
-                pageBreakInside: 'avoid',
+                padding: '2.5rem',
                 backgroundColor: 'white',
                 minHeight: minHeight,
                 display: 'flex',
-                flexDirection: 'column'
+                flexDirection: 'column',
+                boxSizing: 'border-box'
             }}
         >
             <div style={{ flex: 1 }}>
@@ -44,24 +40,55 @@ export const RPHPrintLayout: React.FC<RPHPrintLayoutProps> = ({ record, showPage
                     <div style={{ marginTop: '0.15rem' }}>{record.subjek}</div>
                 </div>
 
+                {record.content?.bidang && (
+                    <div style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
+                        <strong>Bidang:</strong>
+                        <div style={{ marginTop: '0.15rem' }}>{record.content.bidang}</div>
+                    </div>
+                )}
+
                 <div style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
-                    <strong>Tajuk / Standard Kandungan:</strong>
-                    <div style={{ marginTop: '0.15rem', whiteSpace: 'pre-wrap' }}>{record.tajukStandardKandungan}</div>
+                    <strong>Tajuk / Standard Kandungan (SK):</strong>
+                    <div style={{ marginTop: '0.15rem', whiteSpace: 'pre-wrap' }}>{record.content?.tajukStandardKandungan || 'N/A'}</div>
                 </div>
+
+                {record.content?.sp && record.content.sp.length > 0 && (
+                    <div style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
+                        <strong>Standard Pembelajaran (SP):</strong>
+                        <ul style={{ marginTop: '0.15rem', paddingLeft: '1.25rem', listStyleType: 'disc' }}>
+                            {record.content.sp.map((sp, idx) => (
+                                <li key={idx} style={{ marginBottom: '0.25rem' }}>{sp}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
+                {record.content?.spi && record.content.spi.length > 0 && (
+                    <div style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
+                        <strong>Standard Prestasi (SPI):</strong>
+                        <ul style={{ marginTop: '0.15rem', paddingLeft: '1.25rem', listStyleType: 'none' }}>
+                            {record.content.spi.map((spi, idx) => (
+                                <li key={idx} style={{ marginBottom: '0.25rem' }}>
+                                    <strong>TP{spi.tp}:</strong> {spi.desc}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
 
                 <div style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
                     <strong>Objektif:</strong>
-                    <div style={{ marginTop: '0.15rem', whiteSpace: 'pre-wrap' }}>{record.objektif}</div>
+                    <div style={{ marginTop: '0.15rem', whiteSpace: 'pre-wrap' }}>{record.content?.objektif || 'N/A'}</div>
                 </div>
 
                 <div style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
                     <strong>Aktiviti:</strong>
-                    <div style={{ marginTop: '0.15rem', whiteSpace: 'pre-wrap', minHeight: '80px' }}>{record.aktiviti}</div>
+                    <div style={{ marginTop: '0.15rem', whiteSpace: 'pre-wrap', minHeight: '80px' }}>{record.content?.aktiviti || 'N/A'}</div>
                 </div>
 
                 <div style={{ marginBottom: '1.5rem', fontSize: '0.9rem' }}>
                     <strong>Refleksi:</strong>
-                    <div style={{ marginTop: '0.15rem', whiteSpace: 'pre-wrap' }}>{record.refleksi}</div>
+                    <div style={{ marginTop: '0.15rem', whiteSpace: 'pre-wrap' }}>{record.content?.refleksi || '-'}</div>
                 </div>
             </div>
 
@@ -73,6 +100,6 @@ export const RPHPrintLayout: React.FC<RPHPrintLayoutProps> = ({ record, showPage
                     <p>Guru Besar/PK</p>
                 </div>
             </div>
-        </div>
+        </div >
     );
 };

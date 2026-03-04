@@ -3,8 +3,6 @@ import { Edit2, Trash2, Printer, Search, Loader2, Download } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion';
 import type { RPHRecord } from '../types';
 import * as XLSX from 'xlsx';
-// @ts-ignore
-import html2pdf from 'html2pdf.js';
 import { RPHPrintLayout } from './RPHPrintLayout';
 
 interface RPHRecordsProps {
@@ -18,10 +16,11 @@ interface RPHRecordsProps {
 export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDelete, onEdit, onPrint }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
     const filteredRecords = records.filter(rec =>
         rec.subjek.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        rec.tajukStandardKandungan.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (rec.content?.tajukStandardKandungan || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         rec.kelas.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
@@ -46,9 +45,9 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
             'Kelas': rec.kelas,
             'Masa': rec.masa,
             'Subjek': rec.subjek,
-            'Tajuk / Standard Kandungan': rec.tajukStandardKandungan,
-            'Aktiviti': rec.aktiviti,
-            'Refleksi': rec.refleksi
+            'Tajuk / Standard Kandungan': rec.content?.tajukStandardKandungan || '',
+            'Aktiviti': rec.content?.aktiviti || '',
+            'Refleksi': rec.content?.refleksi || ''
         }));
 
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -60,133 +59,139 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
     const isBulkPDF = selectedIds.length > 0;
     const selectedRecords = records.filter(r => selectedIds.includes(r.id));
 
-    const handleDownloadPDFBulk = () => {
-        const element = document.getElementById('bulk-print-area');
-        if (!element || selectedRecords.length === 0) {
-            console.error('Cannot generate PDF: element not found or no records selected');
-            return;
-        }
+    const handleDownloadPDFBulk = async () => {
+        if (selectedRecords.length === 0) return;
+        setIsGeneratingPDF(true);
 
-        console.log('Generating PDF for', selectedRecords.length, 'records');
+        try {
+            // Import and verify libraries first
+            // @ts-ignore
+            const { default: jsPDF } = await import('jspdf');
+            // @ts-ignore
+            const html2canvas = (await import('html2canvas')).default;
 
-        // Store original styles
-        const originalStyles = {
-            position: element.style.position,
-            left: element.style.left,
-            top: element.style.top,
-            width: element.style.width,
-            maxWidth: element.style.maxWidth,
-            visibility: element.style.visibility,
-            opacity: element.style.opacity,
-            zIndex: element.style.zIndex,
-            pointerEvents: element.style.pointerEvents,
-            transform: element.style.transform,
-            display: element.style.display
-        };
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.left = '-10000px';
+            iframe.style.top = '0';
+            iframe.style.width = '210mm';
+            iframe.style.height = 'auto'; // Will expand
+            iframe.style.border = 'none';
+            document.body.appendChild(iframe);
 
-        // Make element visible and properly positioned for html2canvas
-        // Position it far off-screen but still visible to the DOM for rendering
-        element.style.position = 'fixed';
-        element.style.left = '-10000px';
-        element.style.top = '0px';
-        element.style.width = '210mm'; // A4 width
-        element.style.maxWidth = '210mm';
-        element.style.minHeight = '100vh'; // Ensure it has height
-        element.style.visibility = 'visible';
-        element.style.opacity = '1';
-        element.style.zIndex = '-1'; // Behind everything but still rendered
-        element.style.pointerEvents = 'none';
-        element.style.display = 'block';
-        element.style.transform = ''; // Remove any transform
-        element.style.background = 'white'; // Ensure background
+            const doc = iframe.contentDocument || iframe.contentWindow?.document;
+            if (!doc) throw new Error('Cannot access iframe document');
 
-        // Force reflow and wait for rendering
-        void element.offsetHeight; // Force reflow
+            // Copy all styles from main document to iframe
+            const styleSheets = Array.from(document.styleSheets);
+            const styleTagsArray = await Promise.all(styleSheets.map(async sheet => {
+                try {
+                    if (sheet.href) return `<link rel="stylesheet" href="${sheet.href}">`;
+                    if (sheet.cssRules) return `<style>${Array.from(sheet.cssRules).map(r => r.cssText).join('\n')}</style>`;
+                } catch (e) { return ''; }
+                return '';
+            }));
 
-        // Verify element has content
-        console.log('Element content height:', element.scrollHeight, 'px');
-        console.log('Element children:', element.children.length);
+            const fontTag = `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">`;
+            const baseStyles = `<style>
+                :root {
+                  --primary: #14853f; --secondary: #e31e24; --accent: #fde910;
+                  --background: #f8fafc; --surface: #ffffff; --text-main: #1e293b;
+                  --text-muted: #64748b; --border: #e2e8f0;
+                }
+                * { box-sizing: border-box; -webkit-print-color-adjust: exact; }
+                body { 
+                  font-family: 'Plus Jakarta Sans', sans-serif; 
+                  background: white; margin: 0; padding: 0; width: 210mm;
+                  overflow-x: hidden;
+                }
+                .print-record-container { 
+                    width: 210mm; 
+                    height: 297mm; /* Exact A4 height */
+                    display: flex;
+                    flex-direction: column;
+                    margin: 0 !important; 
+                    padding: 2.5rem !important;
+                    background: white;
+                    page-break-after: always;
+                    box-sizing: border-box;
+                    position: relative;
+                }
+                h1, h2, h3, p, strong { color: black !important; }
+            </style>`;
 
-        setTimeout(() => {
-            // Double check element is still visible
-            const rect = element.getBoundingClientRect();
-            console.log('Element bounds:', rect.width, 'x', rect.height);
+            doc.open();
+            doc.write(`<html><head>${fontTag}${baseStyles}${styleTagsArray.join('\n')}</head><body><div id="capture-root"></div></body></html>`);
+            doc.close();
 
-            if (rect.height === 0) {
-                console.error('Element has zero height, cannot generate PDF');
-                // Restore styles before returning
-                element.style.position = originalStyles.position || '';
-                element.style.left = originalStyles.left || '';
-                element.style.top = originalStyles.top || '';
-                element.style.width = originalStyles.width || '';
-                element.style.maxWidth = originalStyles.maxWidth || '';
-                element.style.visibility = originalStyles.visibility || '';
-                element.style.opacity = originalStyles.opacity || '';
-                element.style.zIndex = originalStyles.zIndex || '';
-                element.style.pointerEvents = originalStyles.pointerEvents || '';
-                element.style.transform = originalStyles.transform || '';
-                element.style.display = originalStyles.display || '';
-                element.style.minHeight = '';
-                element.style.background = '';
-                return;
-            }
+            // Wait for iframe and fonts
+            await new Promise(resolve => {
+                const checkFonts = () => {
+                    if (iframe.contentWindow?.document.fonts) {
+                        iframe.contentWindow.document.fonts.ready.then(resolve);
+                    } else {
+                        setTimeout(resolve, 1500);
+                    }
+                };
+                if (doc.readyState === 'complete') {
+                    checkFonts();
+                } else {
+                    iframe.onload = checkFonts;
+                }
+            });
 
-            const opt = {
-                margin: [0.25, 0.25, 0.25, 0.25],
-                filename: `eRPH_Pilihan_${new Date().toISOString().split('T')[0]}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: {
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            const captureRoot = doc.getElementById('capture-root')!;
+            const sourceList = document.getElementById('bulk-print-area')!;
+
+            for (let i = 0; i < selectedRecords.length; i++) {
+                const tempDiv = doc.createElement('div');
+                tempDiv.className = 'print-record-container';
+                captureRoot.appendChild(tempDiv);
+
+                // Clone HTML from our hidden source
+                if (sourceList.children[i]) {
+                    tempDiv.innerHTML = sourceList.children[i].innerHTML;
+                }
+
+                // Render Canvas
+                const canvas = await html2canvas(tempDiv, {
                     scale: 2,
                     useCORS: true,
                     logging: false,
-                    letterRendering: true,
-                    windowWidth: 800,
-                    windowHeight: element.scrollHeight,
-                    allowTaint: true,
+                    width: 794, // 210mm at 96dpi
                     backgroundColor: '#ffffff',
-                    removeContainer: false,
-                    x: 0,
-                    y: 0,
-                    scrollX: 0,
-                    scrollY: 0
-                },
-                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
-                pagebreak: { mode: ['css', 'legacy'], before: '.print-record-container' }
-            } as any;
+                    windowWidth: 794
+                });
 
-            html2pdf().set(opt).from(element).save().then(() => {
-                // Restore original styles after PDF generation
-                element.style.position = originalStyles.position || '';
-                element.style.left = originalStyles.left || '';
-                element.style.top = originalStyles.top || '';
-                element.style.width = originalStyles.width || '';
-                element.style.maxWidth = originalStyles.maxWidth || '';
-                element.style.visibility = originalStyles.visibility || '';
-                element.style.opacity = originalStyles.opacity || '';
-                element.style.zIndex = originalStyles.zIndex || '';
-                element.style.pointerEvents = originalStyles.pointerEvents || '';
-                element.style.transform = originalStyles.transform || '';
-                element.style.display = originalStyles.display || '';
-                element.style.minHeight = '';
-                element.style.background = '';
-            }).catch((error: any) => {
-                console.error('PDF generation error:', error);
-                // Restore styles even on error
-                element.style.position = originalStyles.position || '';
-                element.style.left = originalStyles.left || '';
-                element.style.top = originalStyles.top || '';
-                element.style.width = originalStyles.width || '';
-                element.style.maxWidth = originalStyles.maxWidth || '';
-                element.style.visibility = originalStyles.visibility || '';
-                element.style.opacity = originalStyles.opacity || '';
-                element.style.zIndex = originalStyles.zIndex || '';
-                element.style.pointerEvents = originalStyles.pointerEvents || '';
-                element.style.transform = originalStyles.transform || '';
-                element.style.display = originalStyles.display || '';
-                element.style.minHeight = '';
-                element.style.background = '';
-            });
-        }, 300); // Give more time for rendering
+                const imgData = canvas.toDataURL('image/jpeg', 1.0);
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+                if (i > 0) pdf.addPage();
+
+                // Position image at top of page
+                pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+
+                // Cleanup temp div
+                captureRoot.removeChild(tempDiv);
+            }
+
+            pdf.save(`eRPH_Pilihan_${new Date().toISOString().split('T')[0]}.pdf`);
+            document.body.removeChild(iframe);
+            setIsGeneratingPDF(false);
+            setSelectedIds([]); // Reset selection
+
+        } catch (error) {
+            console.error('PDF Generation Error:', error);
+            setIsGeneratingPDF(false);
+            alert('Gagal menjana PDF. Sila cuba lagi.');
+        }
     };
 
     return (
@@ -243,7 +248,7 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
                             <AnimatePresence>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={4} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                                        <td colSpan={5} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
                                             <Loader2 size={40} className="animate-spin" style={{ margin: '0 auto 1rem', color: 'var(--primary)' }} />
                                             <p>Memuatkan rekod...</p>
                                         </td>
@@ -274,7 +279,7 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
                                             </td>
                                             <td>
                                                 <div style={{ fontWeight: 600 }}>{rec.subjek}</div>
-                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rec.tajukStandardKandungan}</div>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rec.content?.tajukStandardKandungan || ''}</div>
                                             </td>
                                             <td className="no-print">
                                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -307,24 +312,40 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({ records, loading, onDele
                     </table>
                 </div>
             </motion.div >
-            <div id="bulk-print-area" style={{
-                position: 'absolute',
-                left: '100vw',
-                top: '0px',
-                width: '210mm', // A4 width
-                background: 'white',
-                visibility: 'hidden',
-                opacity: 0,
-                zIndex: -1,
-                pointerEvents: 'none',
-                display: 'block'
-            }}>
-                {selectedRecords.map((rec, index) => (
+
+            {/* Loading Overlay */}
+            <AnimatePresence>
+                {isGeneratingPDF && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        style={{
+                            position: 'fixed',
+                            inset: 0,
+                            zIndex: 10000,
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backdropFilter: 'blur(5px)'
+                        }}
+                    >
+                        <Loader2 size={48} className="animate-spin" style={{ color: 'var(--primary)', marginBottom: '1.5rem' }} />
+                        <h3 style={{ fontSize: '1.25rem', color: 'var(--primary)', marginBottom: '0.5rem' }}>Menjana PDF...</h3>
+                        <p style={{ color: 'var(--text-muted)' }}>Sila tunggu sebentar.</p>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Hidden Print Area for DOM Source */}
+            <div id="bulk-print-area" style={{ display: 'none' }}>
+                {selectedRecords.map((rec) => (
                     <RPHPrintLayout
                         key={rec.id}
                         record={rec}
-                        showPageBreak={index < selectedRecords.length - 1}
-                        minHeight="9in"
+                        minHeight="297mm"
                     />
                 ))}
             </div>

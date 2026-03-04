@@ -1,0 +1,7 @@
+{
+  "project_name": "ERPH-Digital",
+  "workflow": "Standard",
+  "priority": "UI/UX Focus",
+  "tech_stack": ["React", "TypeScript", "Supabase", "Vite"],
+  "domain": "Education (Malaysia)"
+}

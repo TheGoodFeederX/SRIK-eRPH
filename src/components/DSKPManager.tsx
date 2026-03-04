@@ -4,7 +4,7 @@ import { type ReferensiRPH } from '../types';
 import {
     Plus, Search, Edit2, Trash2, X, Save, AlertCircle,
     ChevronLeft, ChevronRight, Loader2, CheckCircle2,
-    Database, Inbox, Filter
+    Inbox, Filter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -74,15 +74,35 @@ export const DSKPManager: React.FC = () => {
     const fetchRecords = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
-                .from('referensi_rph')
-                .select('*')
-                .order('subjek', { ascending: true })
-                .order('tahun', { ascending: true })
-                .order('sk', { ascending: true });
+            let allData: ReferensiRPH[] = [];
+            let from = 0;
+            const step = 1000;
+            let more = true;
 
-            if (error) throw error;
-            setRecords(data || []);
+            while (more) {
+                const { data, error } = await supabase
+                    .from('referensi_rph')
+                    .select('*')
+                    .order('subjek', { ascending: true })
+                    .order('tahun', { ascending: true })
+                    .order('sk', { ascending: true })
+                    .range(from, from + step - 1);
+
+                if (error) throw error;
+
+                if (data) {
+                    allData = [...allData, ...data];
+                    if (data.length < step) {
+                        more = false;
+                    } else {
+                        from += step;
+                    }
+                } else {
+                    more = false;
+                }
+            }
+
+            setRecords(allData);
         } catch (error) {
             console.error('Error fetching records:', error);
             addToast('Gagal memuat turun rekod DSKP.', 'error');
@@ -149,12 +169,17 @@ export const DSKPManager: React.FC = () => {
         if (!recordToDelete) return;
 
         try {
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('referensi_rph')
                 .delete()
-                .eq('id', recordToDelete.id);
+                .eq('id', recordToDelete.id)
+                .select();
 
             if (error) throw error;
+
+            if (!data || data.length === 0) {
+                throw new Error('Rekod tidak dapat dipadam. Sila pastikan anda mempunyai kebenaran.');
+            }
 
             await fetchRecords();
             setRecordToDelete(null);
