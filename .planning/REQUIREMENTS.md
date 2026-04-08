@@ -28,6 +28,12 @@
 - **Performance**: Rapid DSKP lookup and efficient record loading.
 - **Reliability**: All saves must be verified with error handling.
 
+## UI & Accessibility Requirements (Phase 5)
+- [x] **UI-01**: Modernized Glassmorphism 2.0 theme engine. (Completed in 05-01)
+- [ ] **UI-02**: WCAG 2.1 AA Accessibility compliance. (In Progress - 05-03 complete, 05-04 pending)
+- [x] **UI-03**: Mobile-first responsive overhaul for cards and forms. (Completed in 05-02, 05-03)
+- [x] **UI-04**: Advanced Jawi/RTL support for icons and layouts. (Completed in 05-01, 05-02, 05-03)
+
 ## Technical Constraints
 - Must work within existing React + Supabase infrastructure.
 - Jawi rendering depends on specific font availability.

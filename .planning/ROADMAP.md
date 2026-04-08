@@ -26,7 +26,7 @@
 
 ## Phase 5: UI Overhaul & Accessibility (IN PROGRESS)
 **Goal:** Modernize the UI with Glassmorphism 2.0 and full WCAG 2.1 compliance.
-- [ ] 05-01-theme-engine-PLAN.md — Refactor CSS variables and glassmorphism 2.0 theme. (UI-01, UI-04)
-- [ ] 05-02-responsive-cards-PLAN.md — Overhaul RPHRecords with responsive card layouts (mobile-first). (UI-03, UI-02)
-- [ ] 05-03-form-ux-PLAN.md — Update RPHForm wizard with better progress tracking and accessibility (aria-labels). (UI-03, UI-02, UI-04)
+- [x] 05-01-theme-engine-PLAN.md — Refactor CSS variables and glassmorphism 2.0 theme. (UI-01, UI-04)
+- [x] 05-02-responsive-cards-PLAN.md — Overhaul RPHRecords with responsive card layouts (mobile-first). (UI-03, UI-02)
+- [x] 05-03-form-ux-PLAN.md — Update RPHForm wizard with better progress tracking and accessibility (aria-labels). (UI-03, UI-02, UI-04)
 - [ ] 05-04-a11y-audit-PLAN.md — Implement WCAG 2.1 compliance (contrast, touch targets, reduced-motion). (UI-02, UI-04)
