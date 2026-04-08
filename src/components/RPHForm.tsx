@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Save, ChevronDown, X, Printer, ArrowLeft, AlertCircle, Download } from 'lucide-react';
+import { Save, ChevronDown, X, Printer, ArrowLeft, AlertCircle, Download, Loader2 } from 'lucide-react';
 import type { RPHRecord } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { RPHPrintLayout } from './RPHPrintLayout';
 import { generateRPH_PDF } from '../lib/pdfGenerator';
+import { PDFReadyModal } from './PDFReadyModal';
+import { WizardStepper } from './WizardStepper';
 
 interface RPHFormProps {
     onSubmit: (record: Omit<RPHRecord, 'id'>) => Promise<void>;
@@ -42,6 +44,8 @@ const getMalayDay = (dateString: string) => {
     const date = new Date(dateString);
     return days[date.getDay()];
 };
+
+const DRAFT_KEY = 'erph_form_draft';
 
 export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialData }) => {
     const initialDate = initialData?.tarikh || new Date().toISOString().split('T')[0];
@@ -82,22 +86,61 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
     const masaDropdownRef = useRef<HTMLDivElement>(null);
     const [showPrintModal, setShowPrintModal] = useState(false);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+    const [pdfModalData, setPdfModalData] = useState<{ isOpen: boolean; url: string | null; fileName: string }>({
+        isOpen: false,
+        url: null,
+        fileName: ''
+    });
+
+    const firstFieldRef = useRef<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(null);
 
     // Initial data fetch
     useEffect(() => {
         const fetchMetadata = async () => {
             try {
                 const { data: subjekData } = await supabase.rpc('get_unique_subjects');
-                if (subjekData) setSubjects(subjekData.map((d: any) => d.subjek));
+                if (subjekData) setSubjects((subjekData as Array<{ subjek: string }>).map((d) => d.subjek));
 
                 const { data: tahunData } = await supabase.rpc('get_unique_years');
-                if (tahunData) setYears(tahunData.map((d: any) => d.tahun));
+                if (tahunData) setYears((tahunData as Array<{ tahun: number }>).map((d) => d.tahun));
             } catch (err) {
                 console.error('Error fetching metadata:', err);
             }
         };
         fetchMetadata();
     }, []);
+
+    // Load draft on mount
+    useEffect(() => {
+        if (!initialData) {
+            const savedDraft = localStorage.getItem(DRAFT_KEY);
+            if (savedDraft) {
+                try {
+                    const parsed = JSON.parse(savedDraft);
+                    setFormData(prev => ({ ...prev, ...parsed.formData }));
+                    setSelectedYear(parsed.selectedYear);
+                    setCurrentStep(parsed.currentStep || 1);
+                } catch (e) {
+                    console.error('Failed to parse draft', e);
+                }
+            }
+        }
+    }, [initialData]);
+
+    // Save draft on change
+    useEffect(() => {
+        if (!initialData) {
+            const draft = { formData, selectedYear, currentStep };
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+        }
+    }, [formData, selectedYear, currentStep, initialData]);
+
+    // Focus management on step change
+    useEffect(() => {
+        if (firstFieldRef.current) {
+            firstFieldRef.current.focus();
+        }
+    }, [currentStep]);
 
     // Validation for each step
     const validateStep = (step: number) => {
@@ -270,18 +313,23 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
         setError(null);
     };
 
-    const handleMultiSelect = (name: 'sp' | 'spi', value: any) => {
+    const handleMultiSelect = (name: 'sp' | 'spi', value: string | { tp: number; desc: string }) => {
         setFormData(prev => {
-            const current = prev[name] as any[];
-            const exists = current.find(item => 
-                name === 'spi' ? (item.tp === value.tp && item.desc === value.desc) : item === value
-            );
-            
-            const next = exists 
-                ? current.filter(item => name === 'spi' ? (item.tp !== value.tp || item.desc !== value.desc) : item !== value)
-                : [...current, value];
-            
-            return { ...prev, [name]: next };
+            if (name === 'sp') {
+                const current = prev.sp;
+                const val = value as string;
+                const exists = current.includes(val);
+                const next = exists ? current.filter(item => item !== val) : [...current, val];
+                return { ...prev, sp: next };
+            } else {
+                const current = prev.spi;
+                const val = value as { tp: number; desc: string };
+                const exists = current.find(item => item.tp === val.tp && item.desc === val.desc);
+                const next = exists 
+                    ? current.filter(item => item.tp !== val.tp || item.desc !== val.desc)
+                    : [...current, val];
+                return { ...prev, spi: next };
+            }
         });
     };
 
@@ -311,6 +359,9 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
 
             await onSubmit(recordToSubmit);
             
+            // Clear draft
+            localStorage.removeItem(DRAFT_KEY);
+
             if (!initialData) {
                 // Reset form
                 const today = new Date().toISOString().split('T')[0];
@@ -331,8 +382,9 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                 setSelectedYear('');
                 setCurrentStep(1);
             }
-        } catch (err: any) {
-            setError(err.message || 'Gagal menyimpan rekod. Sila cuba lagi.');
+        } catch (err: unknown) {
+            const error = err as Error;
+            setError(error.message || 'Gagal menyimpan rekod. Sila cuba lagi.');
         } finally {
             setLoading(false);
         }
@@ -363,8 +415,12 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                     spi: formData.spi
                 }
             };
-            await generateRPH_PDF(recordToGenerate);
+            const blob = await generateRPH_PDF(recordToGenerate);
+            const url = URL.createObjectURL(blob);
+            const fileName = `eRPH_${formData.tarikh}_${formData.kelas.replace(/ /g, '_')}.pdf`;
+
             setIsGeneratingPDF(false);
+            setPdfModalData({ isOpen: true, url, fileName });
         } catch (error) {
             console.error('PDF Generation Error:', error);
             setIsGeneratingPDF(false);
@@ -373,73 +429,63 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
     };
 
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="glass-card"
-            style={{ padding: '2rem' }}
-        >
+        <React.Fragment>
+            <PDFReadyModal
+                isOpen={pdfModalData.isOpen}
+                onClose={() => {
+                    if (pdfModalData.url) URL.revokeObjectURL(pdfModalData.url);
+                    setPdfModalData({ ...pdfModalData, isOpen: false, url: null });
+                }}
+                pdfUrl={pdfModalData.url}
+                fileName={pdfModalData.fileName}
+            />
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="glass-card"
+                style={{ padding: '2rem' }}
+            >
             <h2 style={{ marginBottom: '1.5rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Save size={24} /> {initialData ? 'Kemaskini Rekod' : 'Rekod Pengajaran Harian Baru'}
             </h2>
 
             {/* Stepper */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2.5rem', position: 'relative' }}>
-                <div style={{ 
-                    position: 'absolute', top: '15px', left: '0', right: '0', height: '2px', 
-                    backgroundColor: '#e2e8f0', zIndex: 0 
-                }} />
-                <div style={{ 
-                    position: 'absolute', top: '15px', left: '0', height: '2px', 
-                    backgroundColor: 'var(--primary)', zIndex: 0, 
-                    width: `${((currentStep - 1) / (totalSteps - 1)) * 100}%`,
-                    transition: 'width 0.3s ease'
-                }} />
-                
-                {[
+            <WizardStepper 
+                steps={[
                     { step: 1, label: 'Maklumat Asas' },
                     { step: 2, label: 'DSKP & Standard' },
                     { step: 3, label: 'Kandungan PdPC' },
                     { step: 4, label: 'Semakan' }
-                ].map((s) => (
-                    <div key={s.step} style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                        <div style={{ 
-                            width: '32px', height: '32px', borderRadius: '50%', 
-                            backgroundColor: currentStep >= s.step ? 'var(--primary)' : 'white',
-                            border: `2px solid ${currentStep >= s.step ? 'var(--primary)' : '#e2e8f0'}`,
-                            color: currentStep >= s.step ? 'white' : '#64748b',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontWeight: 'bold', fontSize: '0.875rem',
-                            transition: 'all 0.3s ease'
-                        }}>
-                            {s.step}
-                        </div>
-                        <span style={{ 
-                            fontSize: '0.75rem', fontWeight: currentStep === s.step ? 'bold' : 'normal',
-                            color: currentStep === s.step ? 'var(--primary)' : '#64748b'
-                        }}>{s.label}</span>
-                    </div>
-                ))}
-            </div>
+                ]}
+                currentStep={currentStep}
+                onStepClick={(step) => {
+                    if (step < currentStep) setCurrentStep(step);
+                    else if (validateStep(currentStep)) setCurrentStep(step);
+                }}
+            />
 
             {error && (
-                <div style={{ 
-                    backgroundColor: '#fee2e2', 
-                    border: '1px solid #ef4444', 
-                    color: '#b91c1c', 
-                    padding: '1rem', 
-                    borderRadius: '0.5rem', 
-                    marginBottom: '1.5rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                }}>
+                <div 
+                    id="form-error"
+                    role="alert"
+                    style={{ 
+                        backgroundColor: '#fee2e2', 
+                        border: '1px solid #ef4444', 
+                        color: '#b91c1c', 
+                        padding: '1rem', 
+                        borderRadius: '0.5rem', 
+                        marginBottom: '1.5rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                    }}
+                >
                     <AlertCircle size={20} />
                     {error}
                 </div>
             )}
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} aria-describedby={error ? "form-error" : undefined}>
                 <AnimatePresence mode="wait">
                     {currentStep === 1 && (
                         <motion.div
@@ -449,10 +495,18 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                             exit={{ opacity: 0, x: -20 }}
                             transition={{ duration: 0.2 }}
                         >
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <div className="input-group">
                                     <label htmlFor="tarikh">Tarikh</label>
-                                    <input type="date" id="tarikh" name="tarikh" value={formData.tarikh} onChange={handleChange} required />
+                                    <input 
+                                        type="date" 
+                                        id="tarikh" 
+                                        name="tarikh" 
+                                        value={formData.tarikh} 
+                                        onChange={handleChange} 
+                                        required 
+                                        ref={firstFieldRef as any}
+                                    />
                                 </div>
 
                                 <div className="input-group">
@@ -489,9 +543,14 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                                 </div>
 
                                 <div className="input-group" style={{ position: 'relative' }}>
-                                    <label htmlFor="masa">Masa</label>
+                                    <label id="label-masa">Masa</label>
                                     <div ref={masaDropdownRef} style={{ position: 'relative', width: '100%' }}>
-                                        <div
+                                        <button
+                                            type="button"
+                                            id="masa-trigger"
+                                            aria-haspopup="listbox"
+                                            aria-expanded={isMasaDropdownOpen}
+                                            aria-labelledby="label-masa"
                                             onClick={() => setIsMasaDropdownOpen(!isMasaDropdownOpen)}
                                             className="custom-select-trigger"
                                             style={{
@@ -504,7 +563,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'space-between',
-                                                minHeight: '42px'
+                                                minHeight: '48px'
                                             }}
                                         >
                                             <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
@@ -517,11 +576,13 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                                                 )}
                                             </div>
                                             <ChevronDown size={20} />
-                                        </div>
+                                        </button>
 
                                         <AnimatePresence>
                                             {isMasaDropdownOpen && (
                                                 <motion.div
+                                                    role="listbox"
+                                                    aria-labelledby="label-masa"
                                                     initial={{ opacity: 0, y: -10 }}
                                                     animate={{ opacity: 1, y: 0 }}
                                                     exit={{ opacity: 0, y: -10 }}
@@ -530,7 +591,14 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                                                     {MASA_OPTIONS.map(masa => {
                                                         const isChecked = formData.masa.includes(masa);
                                                         return (
-                                                            <div key={masa} onClick={() => handleMasaToggle(masa)} className={`dropdown-item ${isChecked ? 'selected' : ''}`}>
+                                                            <div 
+                                                                key={masa} 
+                                                                role="option"
+                                                                aria-selected={isChecked}
+                                                                onClick={() => handleMasaToggle(masa)} 
+                                                                className={`dropdown-item ${isChecked ? 'selected' : ''}`}
+                                                                style={{ minHeight: '44px' }}
+                                                            >
                                                                 <div className={`checkbox ${isChecked ? 'checked' : ''}`} />
                                                                 <span>{masa}</span>
                                                             </div>
@@ -562,7 +630,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                             transition={{ duration: 0.2 }}
                         >
                             {/* DSKP Hierarchy Fields */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <div className="input-group">
                                     <label htmlFor="bidang">Bidang</label>
                                     <select 
@@ -572,6 +640,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                                         onChange={handleChange} 
                                         disabled={!formData.subjek || selectedYear === '' || availableBidang.length === 0}
                                         required={availableBidang.length > 0}
+                                        ref={firstFieldRef as any}
                                     >
                                         <option value="">{availableBidang.length === 0 ? 'Tiada Bidang' : 'Pilih Bidang'}</option>
                                         {availableBidang.map(b => <option key={b} value={b}>{b}</option>)}
@@ -596,13 +665,13 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
 
                             <div className="input-group" style={{ marginTop: '1rem' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                    <label style={{ marginBottom: 0 }}>Standard Pembelajaran (SP)</label>
+                                    <label id="label-sp" style={{ marginBottom: 0 }}>Standard Pembelajaran (SP)</label>
                                     {availableSP.length > 0 && (
                                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                                             <button
                                                 type="button"
                                                 className="btn btn-outline"
-                                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', minHeight: '32px' }}
                                                 onClick={() => setFormData(prev => ({ ...prev, sp: availableSP }))}
                                             >
                                                 Pilih Semua
@@ -610,7 +679,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                                             <button
                                                 type="button"
                                                 className="btn btn-outline"
-                                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', minHeight: '32px' }}
                                                 onClick={() => setFormData(prev => ({ ...prev, sp: [] }))}
                                             >
                                                 Kosongkan
@@ -618,15 +687,18 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                                         </div>
                                     )}
                                 </div>
-                                <div className="multi-select-container">
+                                <div className="multi-select-container" role="listbox" aria-labelledby="label-sp" aria-multiselectable="true">
                                     {availableSP.length > 0 ? (
                                         availableSP.map(sp => {
                                             const isSelected = formData.sp.includes(sp);
                                             return (
                                                 <div 
                                                     key={sp} 
+                                                    role="option"
+                                                    aria-selected={isSelected}
                                                     className={`multi-select-item ${isSelected ? 'selected' : ''}`}
                                                     onClick={() => handleMultiSelect('sp', sp)}
+                                                    style={{ minHeight: '44px' }}
                                                 >
                                                     <div className={`checkbox ${isSelected ? 'checked' : ''}`} />
                                                     <span style={{ fontSize: '0.9rem' }}>{sp}</span>
@@ -641,13 +713,13 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
 
                             <div className="input-group" style={{ marginTop: '1rem' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                    <label style={{ marginBottom: 0 }}>Standard Prestasi (SPI)</label>
+                                    <label id="label-spi" style={{ marginBottom: 0 }}>Standard Prestasi (SPI)</label>
                                     {availableSPI.length > 0 && (
                                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                                             <button
                                                 type="button"
                                                 className="btn btn-outline"
-                                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', minHeight: '32px' }}
                                                 onClick={() => setFormData(prev => ({ ...prev, spi: availableSPI }))}
                                             >
                                                 Pilih Semua
@@ -655,7 +727,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                                             <button
                                                 type="button"
                                                 className="btn btn-outline"
-                                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', minHeight: '32px' }}
                                                 onClick={() => setFormData(prev => ({ ...prev, spi: [] }))}
                                             >
                                                 Kosongkan
@@ -663,15 +735,18 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                                         </div>
                                     )}
                                 </div>
-                                <div className="multi-select-container">
+                                <div className="multi-select-container" role="listbox" aria-labelledby="label-spi" aria-multiselectable="true">
                                     {availableSPI.length > 0 ? (
                                         availableSPI.map((spi, idx) => {
                                             const isSelected = formData.spi.some(item => item.tp === spi.tp && item.desc === spi.desc);
                                             return (
                                                 <div 
                                                     key={`${spi.tp}-${idx}`} 
+                                                    role="option"
+                                                    aria-selected={isSelected}
                                                     className={`multi-select-item ${isSelected ? 'selected' : ''}`}
                                                     onClick={() => handleMultiSelect('spi', spi)}
+                                                    style={{ minHeight: '44px' }}
                                                 >
                                                     <div className={`checkbox ${isSelected ? 'checked' : ''}`} />
                                                     <span style={{ fontSize: '0.9rem' }}><strong>TP{spi.tp}:</strong> {spi.desc}</span>
@@ -696,7 +771,16 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                         >
                             <div className="input-group">
                                 <label htmlFor="objektif">Objektif</label>
-                                <textarea id="objektif" name="objektif" value={formData.objektif} onChange={handleChange} rows={3} required className="font-jawi" />
+                                <textarea 
+                                    id="objektif" 
+                                    name="objektif" 
+                                    value={formData.objektif} 
+                                    onChange={handleChange} 
+                                    rows={3} 
+                                    required 
+                                    className="font-jawi" 
+                                    ref={firstFieldRef as any}
+                                />
                             </div>
 
                             <div className="input-group">
@@ -725,9 +809,9 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                                 borderRadius: '0.5rem', 
                                 padding: '1.5rem' 
                             }}>
-                                <h3 style={{ marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Semakan Rekod</h3>
+                                <h3 id="summary-title" style={{ marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Semakan Rekod</h3>
                                 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6" tabIndex={0} ref={firstFieldRef as any}>
                                     <div>
                                         <p style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 'bold' }}>Tarikh & Masa</p>
                                         <p>{formData.tarikh} ({formData.hari})</p>
@@ -766,12 +850,12 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginTop: '2rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem' }}>
                     <div style={{ display: 'flex', gap: '1rem' }}>
                         {currentStep > 1 ? (
-                            <button type="button" className="btn btn-outline" onClick={prevStep}>
-                                <ArrowLeft size={18} /> Kembali
+                            <button type="button" className="btn btn-outline" style={{ minHeight: '48px' }} onClick={prevStep}>
+                                <ArrowLeft size={18} className="rtl-mirror" /> Kembali
                             </button>
                         ) : (
                             onCancel && (
-                                <button type="button" className="btn btn-outline" onClick={onCancel}>
+                                <button type="button" className="btn btn-outline" style={{ minHeight: '48px' }} onClick={onCancel}>
                                     <X size={18} /> Batal
                                 </button>
                             )
@@ -780,16 +864,20 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
 
                     <div style={{ display: 'flex', gap: '1rem' }}>
                         {currentStep < totalSteps ? (
-                            <button type="button" className="btn btn-primary" onClick={nextStep}>
+                            <button type="button" className="btn btn-primary" style={{ minHeight: '48px' }} onClick={nextStep}>
                                 Seterusnya
                             </button>
                         ) : (
                             <>
-                                <button type="button" className="btn btn-outline" onClick={() => setShowPrintModal(true)} title="Pratonton & Muat Turun">
+                                <button type="button" className="btn btn-outline" style={{ minHeight: '48px' }} onClick={() => setShowPrintModal(true)} title="Pratonton & Muat Turun">
                                     <Printer size={18} /> Pratonton
                                 </button>
-                                <button type="submit" className="btn btn-primary" disabled={loading}>
-                                    {loading ? 'Menyimpan...' : (initialData ? 'Kemaskini' : 'Simpan Rekod')}
+                                <button type="submit" className="btn btn-primary" style={{ minHeight: '48px' }} disabled={loading}>
+                                    {loading ? (
+                                        <><Loader2 className="animate-spin" size={18} /> Menyimpan...</>
+                                    ) : (
+                                        initialData ? 'Kemaskini' : 'Simpan Rekod'
+                                    )}
                                 </button>
                             </>
                         )}
@@ -812,7 +900,11 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                             <button className="btn btn-outline" onClick={() => setShowPrintModal(false)}><X size={18} /> Tutup</button>
                             <div style={{ display: 'flex', gap: '0.75rem' }}>
                                 <button className="btn btn-outline" onClick={handleDownloadPDF} disabled={isGeneratingPDF}>
-                                    <Download size={18} /> {isGeneratingPDF ? 'Menjana...' : 'Muat Turun PDF'}
+                                    {isGeneratingPDF ? (
+                                        <><Loader2 className="animate-spin" size={18} /> Menjana...</>
+                                    ) : (
+                                        <><Download size={18} /> Muat Turun PDF</>
+                                    )}
                                 </button>
                                 <button className="btn btn-primary" onClick={() => window.print()}><Printer size={18} /> Cetak</button>
                             </div>
@@ -835,5 +927,6 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                 </div>
             )}
         </motion.div>
+    </React.Fragment>
     );
 };
