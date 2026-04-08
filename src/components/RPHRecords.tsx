@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { RPHRecord } from '../types';
 import * as XLSX from 'xlsx';
 import { generateRPH_PDF, generateBulkRPH_PDF } from '../lib/pdfGenerator';
+import { PDFReadyModal } from './PDFReadyModal';
 
 interface RPHRecordsProps {
     records: RPHRecord[];
@@ -17,6 +18,89 @@ interface RPHRecordsProps {
     onDelete: (id: string) => void;
     onEdit: (record: RPHRecord) => void;
 }
+
+const RPHCard: React.FC<{
+    record: RPHRecord;
+    isSelected: boolean;
+    onToggleSelect: (id: string) => void;
+    onEdit: (record: RPHRecord) => void;
+    onDelete: (id: string) => void;
+    onPrint: (record: RPHRecord) => void;
+}> = ({ record, isSelected, onToggleSelect, onEdit, onDelete, onPrint }) => {
+    return (
+        <motion.div
+            layout
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="glass-modern p-4 mb-4"
+        >
+            <div className="flex justify-between items-start mb-3">
+                <div className="flex items-center gap-3">
+                    <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => onToggleSelect(record.id)}
+                        className="w-5 h-5"
+                    />
+                    <div>
+                        <div className="font-bold text-lg font-jawi" style={{ color: 'var(--primary)' }}>{record.subjek}</div>
+                        <div className="text-sm text-slate-500">{record.kelas}</div>
+                    </div>
+                </div>
+                <div className={`tag-primary ${record.status === 'published' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-500'}`}>
+                    {record.status === 'published' ? 'Diterbitkan' : 'Draf'}
+                </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+                <div>
+                    <div className="text-slate-400 font-medium">Tarikh / Hari</div>
+                    <div className="font-semibold">{record.tarikh} ({record.hari})</div>
+                </div>
+                <div>
+                    <div className="text-slate-400 font-medium">Masa</div>
+                    <div className="font-semibold">{record.masa}</div>
+                </div>
+            </div>
+
+            <div className="mb-4">
+                <div className="text-slate-400 text-xs font-medium mb-1">Tajuk / Standard Kandungan</div>
+                <div className="text-sm line-clamp-2 font-jawi" style={{ maxHeight: '3em', overflow: 'hidden' }}>
+                    {record.content?.tajukStandardKandungan || 'Tiada tajuk'}
+                </div>
+            </div>
+
+            <div className="flex gap-2 pt-3 border-t border-slate-100">
+                <button 
+                    className="btn btn-outline flex-1" 
+                    style={{ padding: '0.5rem', minHeight: '44px' }} 
+                    onClick={() => onEdit(record)}
+                >
+                    <Edit2 size={18} />
+                </button>
+                <button 
+                    className="btn btn-outline flex-1" 
+                    style={{ padding: '0.5rem', minHeight: '44px', color: '#ef4444' }} 
+                    onClick={() => {
+                        if (confirm('Adakah anda pasti mahu memadam rekod ini?')) {
+                            onDelete(record.id);
+                        }
+                    }}
+                >
+                    <Trash2 size={18} />
+                </button>
+                <button 
+                    className="btn btn-primary flex-1" 
+                    style={{ padding: '0.5rem', minHeight: '44px' }} 
+                    onClick={() => onPrint(record)}
+                >
+                    <Printer size={18} />
+                </button>
+            </div>
+        </motion.div>
+    );
+};
 
 export const RPHRecords: React.FC<RPHRecordsProps> = ({ 
     records, 
@@ -32,6 +116,11 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
 }) => {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+    const [pdfModalData, setPdfModalData] = useState<{ isOpen: boolean; url: string | null; fileName: string }>({
+        isOpen: false,
+        url: null,
+        fileName: ''
+    });
 
     const toggleSelect = (id: string) => {
         setSelectedIds(prev =>
@@ -75,8 +164,12 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
         setIsGeneratingPDF(true);
 
         try {
-            await generateBulkRPH_PDF(selectedRecords);
+            const blob = await generateBulkRPH_PDF(selectedRecords);
+            const url = URL.createObjectURL(blob);
+            const fileName = `eRPH_Bulk_${new Date().toISOString().split('T')[0]}.pdf`;
+            
             setIsGeneratingPDF(false);
+            setPdfModalData({ isOpen: true, url, fileName });
             setSelectedIds([]);
         } catch (error) {
             console.error('PDF Generation Error:', error);
@@ -88,8 +181,12 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
     const handleSinglePrint = async (record: RPHRecord) => {
         setIsGeneratingPDF(true);
         try {
-            await generateRPH_PDF(record);
+            const blob = await generateRPH_PDF(record);
+            const url = URL.createObjectURL(blob);
+            const fileName = `eRPH_${record.tarikh}_${record.kelas.replace(/ /g, '_')}.pdf`;
+
             setIsGeneratingPDF(false);
+            setPdfModalData({ isOpen: true, url, fileName });
         } catch (error) {
             console.error('PDF Generation Error:', error);
             setIsGeneratingPDF(false);
@@ -99,6 +196,15 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
 
     return (
         <React.Fragment>
+            <PDFReadyModal
+                isOpen={pdfModalData.isOpen}
+                onClose={() => {
+                    if (pdfModalData.url) URL.revokeObjectURL(pdfModalData.url);
+                    setPdfModalData({ ...pdfModalData, isOpen: false, url: null });
+                }}
+                pdfUrl={pdfModalData.url}
+                fileName={pdfModalData.fileName}
+            />
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -113,21 +219,22 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
                         </p>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                    <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
                         <button
-                            className="btn btn-outline"
+                            className="btn btn-outline w-full md:w-auto"
+                            style={{ height: '48px' }}
                             onClick={isBulkPDF ? handleDownloadPDFBulk : handleDownloadAll}
                             disabled={records.length === 0}
                             title={isBulkPDF ? "Muat Turun Pilihan (PDF)" : "Muat Turun Halaman (Excel)"}
                         >
-                            <Download size={18} /> {isBulkPDF ? 'Muat Turun PDF' : 'Muat Turun Excel'}
+                            <Download size={20} /> {isBulkPDF ? 'Muat Turun PDF' : 'Muat Turun Excel'}
                         </button>
-                        <div style={{ position: 'relative', width: '300px' }}>
-                            <Search style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
+                        <div className="relative w-full md:w-[300px]">
+                            <Search style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={20} />
                             <input
                                 type="text"
-                                placeholder="Cari subjek, kelas, atau hari..."
-                                style={{ paddingLeft: '2.5rem' }}
+                                placeholder="Cari rekod..."
+                                style={{ paddingLeft: '2.5rem', height: '48px' }}
                                 value={searchTerm}
                                 onChange={(e) => {
                                     setSearchTerm(e.target.value);
@@ -138,7 +245,50 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
                     </div>
                 </div>
 
-                <div className="table-container">
+                {/* Mobile View: Card List */}
+                <div className="mobile-only">
+                    <AnimatePresence mode="popLayout">
+                        {loading ? (
+                            <div key="loading-mobile" className="py-10 text-center text-slate-400">
+                                <Loader2 size={40} className="animate-spin mx-auto mb-2 color-primary" style={{ color: 'var(--primary)' }} />
+                                <p>Memuatkan rekod...</p>
+                            </div>
+                        ) : records.length > 0 ? (
+                            <div className="flex flex-col">
+                                <div className="flex justify-between items-center mb-4 px-1">
+                                    <div className="text-sm font-medium text-slate-500">
+                                        Pilih Semua
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedIds.length === records.length && records.length > 0}
+                                        onChange={toggleSelectAll}
+                                        className="w-5 h-5"
+                                    />
+                                </div>
+                                {records.map((rec) => (
+                                    <RPHCard
+                                        key={rec.id}
+                                        record={rec}
+                                        isSelected={selectedIds.includes(rec.id)}
+                                        onToggleSelect={toggleSelect}
+                                        onEdit={onEdit}
+                                        onDelete={onDelete}
+                                        onPrint={handleSinglePrint}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <div key="empty-mobile" className="py-10 text-center text-slate-400">
+                                <Search size={48} className="mx-auto mb-4 opacity-20" />
+                                <h3 className="text-lg font-bold text-slate-700">Tiada Rekod Dijumpai</h3>
+                            </div>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                {/* Desktop View: Table */}
+                <div className="table-container desktop-only">
                     <table>
                         <thead>
                             <tr>
@@ -223,8 +373,20 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
                                         exit={{ opacity: 0 }}
                                         key="empty"
                                     >
-                                        <td colSpan={5} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                                            {searchTerm ? 'Tiada rekod padan dengan carian anda.' : 'Tiada rekod dijumpai. Sila tambah rekod baru.'}
+                                        <td colSpan={5} className="py-20 text-center">
+                                            <div className="flex flex-col items-center justify-center text-slate-400">
+                                                <div className="bg-slate-50 p-6 rounded-full mb-4">
+                                                    <Search size={48} strokeWidth={1.5} />
+                                                </div>
+                                                <h3 className="text-xl font-bold text-slate-700 mb-2">
+                                                    {searchTerm ? 'Tiada Rekod Dijumpai' : 'Tiada Rekod Lagi'}
+                                                </h3>
+                                                <p className="max-w-xs mx-auto">
+                                                    {searchTerm 
+                                                        ? `Carian "${searchTerm}" tidak memulangkan sebarang keputusan.` 
+                                                        : 'Anda belum mencipta sebarang rekod eRPH. Mulakan dengan menekan butang "Rekod Baru".'}
+                                                </p>
+                                            </div>
                                         </td>
                                     </motion.tr>
                                 )}
