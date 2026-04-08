@@ -19,168 +19,98 @@ export const LoginPage: React.FC = () => {
 
         try {
             if (isLogin) {
-                console.log('LoginPage: Attempting sign in...', { email });
-                const { data, error } = await supabase.auth.signInWithPassword({
+                const { error } = await supabase.auth.signInWithPassword({
                     email,
                     password,
                 });
-                if (error) {
-                    console.error('LoginPage: Sign in error', error);
-                    throw error;
-                }
-                console.log('LoginPage: Sign in successful', { user: data.user?.id });
+                if (error) throw error;
             } else {
-                console.log('LoginPage: Attempting sign up...', { email });
                 const { data, error } = await supabase.auth.signUp({
                     email,
                     password,
                     options: {
                         emailRedirectTo: window.location.origin,
-                        // Auto-confirm if email confirmation is disabled in Supabase settings
-                        // This helps in development/testing environments
                     }
                 });
                 
                 if (error) {
-                    console.error('LoginPage: Sign up error', error);
-                    // Provide more helpful error messages
                     let errorMessage = error.message;
-                    
-                    if (error.message.includes('signup is disabled') || error.message.includes('Signup disabled')) {
-                        errorMessage = 'Pendaftaran baru telah dinyahaktifkan. Sila hubungi pentadbir.';
+                    if (error.message.includes('signup is disabled')) {
+                        errorMessage = 'Pendaftaran baru telah dinyahaktifkan.';
                     } else if (error.message.includes('User already registered')) {
-                        errorMessage = 'E-mel ini sudah didaftarkan. Sila log masuk atau gunakan e-mel lain.';
-                    } else if (error.message.includes('Invalid email')) {
-                        errorMessage = 'Format e-mel tidak sah. Sila masukkan e-mel yang betul.';
-                    } else if (error.message.includes('Password')) {
-                        errorMessage = 'Kata laluan tidak memenuhi keperluan. Sila cuba kata laluan yang lebih kuat.';
-                    } else if (error.message.includes('email')) {
-                        errorMessage = `Ralat dengan e-mel: ${error.message}`;
+                        errorMessage = 'E-mel ini sudah didaftarkan.';
                     }
-                    
                     throw new Error(errorMessage);
                 }
                 
-                console.log('LoginPage: Sign up response', { 
-                    user: data.user?.id, 
-                    session: !!data.session,
-                    requiresConfirmation: !data.session && data.user 
-                });
-                
-                // If user is created and session exists, they're automatically logged in
-                // This happens when email confirmation is disabled in Supabase
                 if (data.session && data.user) {
-                    setMessage('Akaun berjaya dicipta! Anda telah log masuk secara automatik.');
-                    // The auth state change will handle navigation
+                    setMessage('Akaun berjaya dicipta! Anda telah log masuk.');
                     return;
                 }
                 
-                // If user is created but needs email confirmation
                 if (data.user && !data.session) {
-                    setMessage('Akaun berjaya dicipta! Sila semak e-mel anda untuk pautan pengesahan.');
-                } else {
-                    setMessage('Akaun berjaya dicipta!');
+                    setMessage('Akaun berjaya dicipta! Sila semak e-mel anda.');
                 }
             }
-        } catch (err: any) {
-            console.error('LoginPage: Authentication error', err);
-            setError(err.message || 'An error occurred during authentication');
+        } catch (err: unknown) {
+            const error = err as Error;
+            setError(error.message || 'Ralat berlaku semasa pengesahan');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="auth-container" style={{
-            minHeight: '100vh',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '2rem',
-            background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
-        }}>
+        <div className="min-h-screen flex items-center justify-center p-8 bg-slate-50 font-jawi">
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="auth-card"
-                style={{
-                    width: '100%',
-                    maxWidth: '400px',
-                    backgroundColor: 'white',
-                    padding: '2.5rem',
-                    borderRadius: '1.5rem',
-                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-                    textAlign: 'center'
-                }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-md glass-modern p-10 text-center border-slate-300 shadow-2xl relative"
             >
-                <div style={{ marginBottom: '2rem' }}>
-                    <div style={{
-                        backgroundColor: 'white',
-                        padding: '1rem',
-                        borderRadius: '1.25rem',
-                        boxShadow: 'var(--shadow)',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginBottom: '1rem'
-                    }}>
-                        <img src="/logo.png" alt="Logo" style={{ width: '64px', height: '64px', objectFit: 'contain' }} />
+
+                <div className="mb-8">
+                    <div className="bg-white/80 backdrop-blur-md p-4 rounded-2xl shadow-sm inline-flex items-center justify-center mb-6 border border-white">
+                        <img src="/logo.png" alt="Logo eRPH" className="w-16 h-16 object-contain" />
                     </div>
-                    <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+                    <h2 id="login-title" className="text-3xl font-black text-slate-800 mb-2 tracking-tight">
                         {isLogin ? 'Selamat Kembali' : 'Daftar Akaun'}
                     </h2>
-                    <p style={{ color: 'var(--text-muted)' }}>
-                        {isLogin ? 'Log masuk ke sistem eRPH anda' : 'Sila isi maklumat untuk mendaftar'}
+                    <p className="text-slate-600 font-medium">
+                        {isLogin ? 'Log masuk ke sistem eRPH digital anda' : 'Sila isi maklumat untuk mendaftar'}
                     </p>
                 </div>
 
-                <form onSubmit={handleAuth} style={{ textAlign: 'left' }}>
-                    <div style={{ marginBottom: '1.25rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
-                            E-mel
-                        </label>
-                        <div style={{ position: 'relative' }}>
-                            <Mail size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <form onSubmit={handleAuth} className="text-left space-y-5" aria-labelledby="login-title">
+                    <div className="input-group">
+                        <label htmlFor="email" className="font-bold text-slate-800 mb-1 block">E-mel</label>
+                        <div className="relative">
+                            <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" aria-hidden="true" />
                             <input
+                                id="email"
                                 type="email"
                                 required
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 placeholder="anda@email.com"
-                                style={{
-                                    width: '100%',
-                                    padding: '0.75rem 1rem 0.75rem 2.75rem',
-                                    borderRadius: '0.75rem',
-                                    border: '1px solid #e2e8f0',
-                                    outline: 'none',
-                                    fontSize: '1rem',
-                                    transition: 'border-color 0.2s'
-                                }}
+                                className="pl-12 w-full py-3 bg-white border-slate-300 focus:border-emerald-600 transition-all rounded-xl min-h-[44px]"
+                                aria-required="true"
                             />
                         </div>
                     </div>
 
-                    <div style={{ marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
-                            Kata Laluan
-                        </label>
-                        <div style={{ position: 'relative' }}>
-                            <Lock size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                    <div className="input-group">
+                        <label htmlFor="password" className="font-bold text-slate-800 mb-1 block">Kata Laluan</label>
+                        <div className="relative">
+                            <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" aria-hidden="true" />
                             <input
+                                id="password"
                                 type="password"
                                 required
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 placeholder="••••••••"
-                                style={{
-                                    width: '100%',
-                                    padding: '0.75rem 1rem 0.75rem 2.75rem',
-                                    borderRadius: '0.75rem',
-                                    border: '1px solid #e2e8f0',
-                                    outline: 'none',
-                                    fontSize: '1rem',
-                                    transition: 'border-color 0.2s'
-                                }}
+                                className="pl-12 w-full py-3 bg-white border-slate-300 focus:border-emerald-600 transition-all rounded-xl min-h-[44px]"
+                                aria-required="true"
                             />
                         </div>
                     </div>
@@ -191,21 +121,11 @@ export const LoginPage: React.FC = () => {
                                 initial={{ opacity: 0, height: 0 }}
                                 animate={{ opacity: 1, height: 'auto' }}
                                 exit={{ opacity: 0, height: 0 }}
-                                style={{ marginBottom: '1.25rem' }}
+                                role="alert"
+                                className="bg-red-50/80 backdrop-blur-sm text-red-700 p-4 rounded-xl text-sm flex items-center gap-3 border border-red-100"
                             >
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.5rem',
-                                    padding: '0.75rem',
-                                    backgroundColor: '#fee2e2',
-                                    color: '#991b1b',
-                                    borderRadius: '0.5rem',
-                                    fontSize: '0.875rem'
-                                }}>
-                                    <AlertCircle size={16} />
-                                    {error}
-                                </div>
+                                <AlertCircle size={18} />
+                                <span className="font-medium">{error}</span>
                             </motion.div>
                         )}
                         {message && (
@@ -213,21 +133,11 @@ export const LoginPage: React.FC = () => {
                                 initial={{ opacity: 0, height: 0 }}
                                 animate={{ opacity: 1, height: 'auto' }}
                                 exit={{ opacity: 0, height: 0 }}
-                                style={{ marginBottom: '1.25rem' }}
+                                role="status"
+                                className="bg-emerald-50/80 backdrop-blur-sm text-emerald-700 p-4 rounded-xl text-sm flex items-center gap-3 border border-emerald-100"
                             >
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.5rem',
-                                    padding: '0.75rem',
-                                    backgroundColor: '#dcfce7',
-                                    color: '#166534',
-                                    borderRadius: '0.5rem',
-                                    fontSize: '0.875rem'
-                                }}>
-                                    <AlertCircle size={16} />
-                                    {message}
-                                </div>
+                                <AlertCircle size={18} />
+                                <span className="font-medium">{message}</span>
                             </motion.div>
                         )}
                     </AnimatePresence>
@@ -235,53 +145,28 @@ export const LoginPage: React.FC = () => {
                     <button
                         type="submit"
                         disabled={loading}
-                        style={{
-                            width: '100%',
-                            padding: '0.875rem',
-                            backgroundColor: 'var(--primary)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '0.75rem',
-                            fontSize: '1rem',
-                            fontWeight: 600,
-                            cursor: loading ? 'not-allowed' : 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.5rem',
-                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                            transition: 'transform 0.1s, opacity 0.2s',
-                            opacity: loading ? 0.7 : 1
-                        }}
+                        className="btn btn-primary w-full py-4 text-lg shadow-lg shadow-emerald-900/10 active:scale-[0.98] mt-2"
                     >
                         {loading ? (
-                            <Loader2 className="animate-spin" size={20} />
+                            <Loader2 className="animate-spin" size={24} aria-label="Memproses..." />
                         ) : isLogin ? (
                             <>
-                                <LogIn size={20} /> Log Masuk
+                                <LogIn size={20} aria-hidden="true" /> Log Masuk
                             </>
                         ) : (
                             <>
-                                <UserPlus size={20} /> Daftar Akaun
+                                <UserPlus size={20} aria-hidden="true" /> Daftar Akaun
                             </>
                         )}
                     </button>
                 </form>
 
-                <div style={{ marginTop: '2rem', borderTop: '1px solid #f1f5f9', paddingTop: '1.5rem' }}>
-                    <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                <div className="mt-8 pt-6 border-t border-slate-200">
+                    <p className="text-slate-600 text-sm font-medium">
                         {isLogin ? 'Belum mempunyai akaun?' : 'Sudah mempunyai akaun?'}
                         <button
                             onClick={() => setIsLogin(!isLogin)}
-                            style={{
-                                marginLeft: '0.5rem',
-                                color: 'var(--primary)',
-                                fontWeight: 600,
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontSize: '0.875rem'
-                            }}
+                            className="ml-2 text-emerald-700 font-bold hover:underline focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 rounded px-1"
                         >
                             {isLogin ? 'Daftar sekarang' : 'Log masuk'}
                         </button>

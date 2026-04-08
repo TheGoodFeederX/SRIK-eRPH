@@ -10,15 +10,15 @@
   --background: #f8fafc;
   --surface: #ffffff;
   --text-main: #1e293b;
-  --text-muted: #64748b;
-  --border: #e2e8f0;
+  --text-muted: #374151; /* Increased contrast from #475569 */
+  --border: #94a3b8; /* Increased contrast from #cbd5e1 */
   --shadow: 0 4px 6px -1px rgb(20 133 63 / 0.1), 0 2px 4px -2px rgb(20 133 63 / 0.1);
   --shadow-lg: 0 10px 15px -3px rgb(20 133 63 / 0.1), 0 4px 6px -4px rgb(20 133 63 / 0.1);
-  --glass: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass: rgba(255, 255, 255, 0.9); /* Increased opacity for accessibility */
+  --glass-border: rgba(255, 255, 255, 0.4);
   
   /* Glassmorphism 2.0 (Liquid Glass) */
-  --glass-bg: rgba(255, 255, 255, 0.15);
+  --glass-bg: rgba(255, 255, 255, 0.8); /* Increased opacity for accessibility */
   --glass-blur: 16px;
   --glass-saturate: 180%;
   --shadow-glass: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 20px 25px -5px rgba(0, 0, 0, 0.15);
@@ -100,6 +100,7 @@ body {
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   padding: 0.75rem 1.5rem;
   border-radius: 0.5rem;
@@ -108,40 +109,7 @@ body {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   border: none;
   font-size: 0.95rem;
-}
-
-.btn-primary {
-  background-color: var(--primary);
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: var(--primary-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
-}
-
-.btn-outline {
-  background-color: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-main);
-}
-
-.btn-outline:hover {
-  background-color: var(--background);
-  border-color: var(--text-muted);
-}
-
-.input-group {
-  margin-bottom: 1.25rem;
-}
-
-label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-  color: var(--text-main);
-  font-size: 0.875rem;
+  min-height: 44px;
 }
 
 input,
@@ -155,6 +123,7 @@ textarea {
   transition: border-color 0.2s;
   font-family: inherit;
   font-size: 1rem;
+  min-height: 44px;
 }
 
 input:focus,
@@ -422,8 +391,8 @@ tr:hover td {
 .bg-slate-50 { background-color: #f8fafc; }
 .bg-emerald-50 { background-color: #ecfdf5; }
 .border-slate-100 { border-color: #f1f5f9; }
-.text-slate-400 { color: #94a3b8; }
-.text-slate-500 { color: #64748b; }
+.text-slate-500 { color: #475569; }
+.text-slate-600 { color: #334155; }
 .text-emerald-600 { color: #059669; }
 
 @media (min-width: 768px) {
