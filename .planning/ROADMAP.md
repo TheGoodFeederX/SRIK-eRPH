@@ -18,8 +18,15 @@
 - [x] 03-02-pdf-engine-PLAN.md — Implement high-quality PDF generation with full RTL/Jawi support.
 - [x] 03-03-kssr-template-PLAN.md — Create print-ready templates that match KSSR standards.
 
-## Phase 4: Polish & Launch (Next Focus)
+## Phase 4: Polish & Launch (COMPLETED)
 **Goal:** Final verification and user-readiness.
-- [ ] User feedback loop and UI refinements.
-- [ ] Performance audit and final bug fixes.
-- [ ] Documentation for deployment and maintenance.
+- [x] 04-01-ui-polish-PLAN.md — Improve responsiveness and visual consistency.
+- [x] 04-02-mobile-pdf-fix-PLAN.md — Resolve mobile PDF download issues.
+- [x] 04-03-launch-prep-PLAN.md — Documentation and final cleanup.
+
+## Phase 5: UI Overhaul & Accessibility (IN PROGRESS)
+**Goal:** Modernize the UI with Glassmorphism 2.0 and full WCAG 2.1 compliance.
+- [ ] 05-01-theme-engine-PLAN.md — Refactor CSS variables and glassmorphism 2.0 theme. (UI-01, UI-04)
+- [ ] 05-02-responsive-cards-PLAN.md — Overhaul RPHRecords with responsive card layouts (mobile-first). (UI-03, UI-02)
+- [ ] 05-03-form-ux-PLAN.md — Update RPHForm wizard with better progress tracking and accessibility (aria-labels). (UI-03, UI-02, UI-04)
+- [ ] 05-04-a11y-audit-PLAN.md — Implement WCAG 2.1 compliance (contrast, touch targets, reduced-motion). (UI-02, UI-04)
