@@ -1,11 +1,10 @@
-// @ts-ignore
 import * as pdfMake from 'pdfmake/build/pdfmake';
 import type { RPHRecord } from '../types';
 import { processJawi, processJawiArray } from './jawiUtils';
+import type { TDocumentDefinitions, TFontDictionary } from 'pdfmake/interfaces';
 
 // Font configuration
-// In the browser, pdfMake can load fonts via URL
-const fonts = {
+const fonts: TFontDictionary = {
     NotoSansArabic: {
         normal: `${window.location.origin}/fonts/NotoSansArabic-Regular.ttf`,
         bold: `${window.location.origin}/fonts/NotoSansArabic-Bold.ttf`,
@@ -14,51 +13,68 @@ const fonts = {
 
 /**
  * Generates a PDF for a single RPH record using pdfmake.
+ * Returns the PDF as a Blob.
  * 
  * @param record The RPH record to generate.
  */
-export const generateRPH_PDF = async (record: RPHRecord): Promise<void> => {
+export const generateRPH_PDF = async (record: RPHRecord): Promise<Blob> => {
     const docDefinition = createRPHDocDefinition(record);
     
-    // @ts-ignore
-    pdfMake.createPdf(docDefinition, undefined, fonts).download(
-        `eRPH_${record.tarikh}_${record.kelas.replace(/ /g, '_')}.pdf`
-    );
+    return new Promise((resolve) => {
+        // @ts-expect-error - pdfmake type mismatch in library build
+        const pdfDoc = pdfMake.createPdf(docDefinition, undefined, fonts);
+        // @ts-expect-error - pdfmake type mismatch in library build
+        pdfDoc.getBlob((blob: Blob) => {
+            resolve(blob);
+        });
+    });
 };
 
 /**
  * Generates a bulk PDF for multiple RPH records.
+ * Returns the PDF as a Blob.
  * 
  * @param records Array of RPH records.
  */
-export const generateBulkRPH_PDF = async (records: RPHRecord[]): Promise<void> => {
-    if (records.length === 0) return;
+export const generateBulkRPH_PDF = async (records: RPHRecord[]): Promise<Blob> => {
+    if (records.length === 0) throw new Error('No records to generate PDF');
 
-    const content: any[] = [];
+    const content: unknown[] = [];
     
     for (let i = 0; i < records.length; i++) {
         const recordContent = createRPHDocDefinition(records[i]).content;
-        content.push(...(Array.isArray(recordContent) ? recordContent : [recordContent]));
+        if (recordContent) {
+            if (Array.isArray(recordContent)) {
+                content.push(...recordContent);
+            } else {
+                content.push(recordContent);
+            }
+        }
         
         if (i < records.length - 1) {
             content.push({ text: '', pageBreak: 'after' });
         }
     }
 
-    const docDefinition = {
+    const docDefinition: TDocumentDefinitions = {
+        // @ts-expect-error - pdfmake Content type is highly complex
         content,
         defaultStyle: {
             font: 'NotoSansArabic',
             fontSize: 10,
         },
         styles: getStyles(),
-        pageMargins: [40, 40, 40, 40] as [number, number, number, number],
+        pageMargins: [40, 40, 40, 40],
     };
 
-    // @ts-ignore
-    pdfMake.createPdf(docDefinition, undefined, fonts).download(
-        `eRPH_Bulk_${new Date().toISOString().split('T')[0]}.pdf`
-    );
+    return new Promise((resolve) => {
+        // @ts-expect-error - pdfmake type mismatch in library build
+        const pdfDoc = pdfMake.createPdf(docDefinition, undefined, fonts);
+        // @ts-expect-error - pdfmake type mismatch in library build
+        pdfDoc.getBlob((blob: Blob) => {
+            resolve(blob);
+        });
+    });
 };
 
 function getStyles() {
@@ -66,26 +82,27 @@ function getStyles() {
         header: {
             fontSize: 14,
             bold: true,
-            alignment: 'center',
-            margin: [0, 0, 0, 5]
+            alignment: 'center' as const,
+            margin: [0, 0, 0, 5] as [number, number, number, number]
         },
         subheader: {
             fontSize: 12,
             bold: true,
-            alignment: 'center',
-            margin: [0, 0, 0, 10]
+            alignment: 'center' as const,
+            margin: [0, 0, 0, 10] as [number, number, number, number]
         },
         label: {
             bold: true,
             fillColor: '#f8fafc',
-            margin: [5, 5, 5, 5]
+            margin: [5, 5, 5, 5] as [number, number, number, number]
         },
         cell: {
-            margin: [5, 5, 5, 5]
+            margin: [5, 5, 5, 5] as [number, number, number, number]
         },
         jawiText: {
             fontSize: 11,
-            lineHeight: 1.4
+            lineHeight: 1.4,
+            alignment: 'right' as const
         }
     };
 }
@@ -93,7 +110,7 @@ function getStyles() {
 /**
  * Internal helper to create the document definition for a single RPH.
  */
-function createRPHDocDefinition(record: RPHRecord): any {
+function createRPHDocDefinition(record: RPHRecord): TDocumentDefinitions {
     const subjek = processJawi(record.subjek);
     const bidang = processJawi(record.content?.bidang);
     const sk = processJawi(record.content?.tajukStandardKandungan);
@@ -141,13 +158,13 @@ function createRPHDocDefinition(record: RPHRecord): any {
                 table: {
                     widths: [120, '*'],
                     body: [
-                        [{ text: 'SUBJEK', style: 'label' }, { text: subjek, style: 'cell' }],
-                        bidang ? [{ text: 'BIDANG', style: 'label' }, { text: bidang, style: 'cell' }] : [],
-                        [{ text: 'TAJUK / SK', style: 'label' }, { text: sk, style: 'cell' }],
+                        [{ text: 'SUBJEK', style: 'label' }, { text: subjek, style: ['cell', 'jawiText'] }],
+                        bidang ? [{ text: 'BIDANG', style: 'label' }, { text: bidang, style: ['cell', 'jawiText'] }] : [],
+                        [{ text: 'TAJUK / SK', style: 'label' }, { text: sk, style: ['cell', 'jawiText'] }],
                         [
                             { text: 'STANDARD\nPEMBELAJARAN (SP)', style: 'label' },
                             {
-                                ul: sp,
+                                ul: sp.map(s => ({ text: s, alignment: 'right' })),
                                 style: 'cell'
                             }
                         ],
@@ -158,7 +175,8 @@ function createRPHDocDefinition(record: RPHRecord): any {
                                     text: [
                                         { text: `TP${s.tp}: `, bold: true },
                                         { text: processJawi(s.desc) }
-                                    ]
+                                    ],
+                                    alignment: 'right'
                                 })),
                                 style: 'cell'
                             }
@@ -198,6 +216,6 @@ function createRPHDocDefinition(record: RPHRecord): any {
             fontSize: 10,
         },
         styles: getStyles(),
-        pageMargins: [40, 40, 40, 40] as [number, number, number, number],
+        pageMargins: [40, 40, 40, 40],
     };
 }

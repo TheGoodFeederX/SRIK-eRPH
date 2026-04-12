@@ -3,16 +3,20 @@ declare module 'arabic-reshaper' {
 }
 
 declare module 'bidi-js' {
-    interface BidiOptions {
-        mirror?: boolean;
+    export interface BidiData {
+        levels: number[];
+        paragraphs: Array<{
+            start: number;
+            end: number;
+            level: number;
+        }>;
     }
-    interface BidiInstance {
-        process(text: string, options?: BidiOptions): {
-            text: string;
-            levels: number[];
-            getReorderedText(): string;
-        };
+
+    export interface BidiInstance {
+        getEmbeddingLevels(text: string, direction?: 'ltr' | 'rtl'): BidiData;
+        getReorderedString(text: string, bidiData: BidiData): string;
     }
-    function bidi(): BidiInstance;
-    export default bidi;
+
+    function bidiFactory(): BidiInstance;
+    export default bidiFactory;
 }
