@@ -8,6 +8,7 @@
     "dev:client": "vite --host",
     "dev:server": "tsx watch server/index.ts",
     "server": "tsx server/index.ts",
+    "seed:admin": "tsx server/db/seed-admin.ts",
     "seed:dskp": "tsx server/db/seed-dskp.ts",
     "test": "vitest run",
     "test:watch": "vitest",
