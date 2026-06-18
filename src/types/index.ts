@@ -1,8 +1,23 @@
+export type UserRole = 'teacher' | 'admin';
+
+export interface AppUser {
+    id: string;
+    email: string;
+    name: string;
+    role: UserRole;
+}
+
+export interface Profile extends AppUser {
+    created_at?: string;
+    updated_at?: string;
+}
+
 export interface RPHRecord {
     id: string;
-    user_id: string;
+    user_id?: string;
     tarikh: string;
     hari: string;
+    tahun?: number;
     kelas: string;
     masa: string;
     subjek: string;
@@ -15,17 +30,39 @@ export interface RPHRecord {
         sp?: string[];
         spi?: Array<{ tp: number; desc: string }>;
     };
+    status?: 'draft' | 'published';
     created_at?: string;
+    updated_at?: string;
 }
 
 export interface ReferensiRPH {
     id: string;
     subjek: string;
-    tahun: number | null;
-    bidang?: string;
+    tahun: number;
+    bidang?: string | null;
     sk: string;
-    sp?: string[];
-    spi?: Array<{ tp: number; desc: string }>;
+    sp: string[];
+    spi: Array<{ tp: number; desc: string }>;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface PaginatedResponse<T> {
+    data: T[];
+    pagination: {
+        page: number;
+        pageSize: number;
+        total: number;
+        totalPages: number;
+    };
+}
+
+export interface ApiErrorResponse {
+    error: {
+        code: string;
+        message: string;
+        details?: unknown;
+    };
 }
 
 export type Tab = 'form' | 'records' | 'dskp' | 'settings';
