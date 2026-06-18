@@ -23,7 +23,7 @@ if (!email) {
   try {
     migrateAppSchema(db);
     const profile = setAdminRole(db, email);
-    console.log(`Updated profile: ${profile.email} (${profile.role})`);
+    console.log(JSON.stringify(profile, null, 2));
   } finally {
     db.close();
   }
