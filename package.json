@@ -4,7 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host",
+    "dev": "concurrently \"vite --host\" \"tsx watch server/index.ts\"",
+    "dev:client": "vite --host",
+    "dev:server": "tsx watch server/index.ts",
+    "server": "tsx server/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
