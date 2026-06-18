@@ -45,6 +45,11 @@ const getMalayDay = (dateString: string) => {
     return days[date.getDay()];
 };
 
+const parseYearFromKelas = (kelas: string) => {
+    const match = kelas.match(/^([1-6])\b/);
+    return match ? Number(match[1]) : '';
+};
+
 const DRAFT_KEY = 'erph_form_draft';
 
 export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialData }) => {
@@ -72,7 +77,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
 
     const [subjects, setSubjects] = useState<string[]>([]);
     const [years, setYears] = useState<number[]>([]);
-    const [selectedYear, setSelectedYear] = useState<number | ''>('');
+    const [selectedYear, setSelectedYear] = useState<number | ''>(initialData?.tahun ?? parseYearFromKelas(initialData?.kelas ?? ''));
     
     // DSKP Hierarchical data
     const [availableBidang, setAvailableBidang] = useState<string[]>([]);
@@ -342,6 +347,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
             const recordToSubmit: Omit<RPHRecord, 'id'> = {
                 tarikh: formData.tarikh,
                 hari: formData.hari,
+                tahun: Number(selectedYear),
                 kelas: formData.kelas,
                 masa: formData.masa,
                 subjek: formData.subjek,
@@ -405,6 +411,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                 ...formData,
                 id: 'temp',
                 user_id: initialData?.user_id || '',
+                tahun: Number(selectedYear),
                 content: {
                     bidang: formData.bidang,
                     tajukStandardKandungan: formData.tajukStandardKandungan,
@@ -913,6 +920,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                             ...formData, 
                             id: 'temp', 
                             user_id: initialData?.user_id || '',
+                            tahun: Number(selectedYear),
                             content: { 
                                 bidang: formData.bidang,
                                 tajukStandardKandungan: formData.tajukStandardKandungan,

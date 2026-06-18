@@ -61,12 +61,9 @@ function requireTahun(tahun: number | undefined): number {
 function paginate<T>(data: T[], total: number, page: number, pageSize: number): PaginatedResponse<T> {
   return {
     data,
-    pagination: {
-      page,
-      pageSize,
-      total,
-      totalPages: Math.ceil(total / pageSize),
-    },
+    totalCount: total,
+    page,
+    pageSize,
   };
 }
 

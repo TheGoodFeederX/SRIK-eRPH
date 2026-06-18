@@ -4,20 +4,20 @@ export interface AppUser {
     id: string;
     email: string;
     name: string;
-    role: UserRole;
 }
 
 export interface Profile extends AppUser {
+    role: UserRole;
     created_at?: string;
     updated_at?: string;
 }
 
 export interface RPHRecord {
     id: string;
-    user_id?: string;
+    user_id: string;
     tarikh: string;
     hari: string;
-    tahun?: number;
+    tahun: number;
     kelas: string;
     masa: string;
     subjek: string;
@@ -49,19 +49,15 @@ export interface ReferensiRPH {
 
 export interface PaginatedResponse<T> {
     data: T[];
-    pagination: {
-        page: number;
-        pageSize: number;
-        total: number;
-        totalPages: number;
-    };
+    totalCount: number;
+    page: number;
+    pageSize: number;
 }
 
 export interface ApiErrorResponse {
     error: {
         code: string;
         message: string;
-        details?: unknown;
     };
 }
 

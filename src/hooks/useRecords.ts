@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { RPHRecord } from '../types';
 import { supabase } from '../lib/supabaseClient';
-import { useAuth } from '../components/AuthContext';
+import { useAuth } from './useAuth';
+
+const parseYearFromKelas = (kelas: string) => {
+    const match = kelas.match(/^([1-6])\b/);
+    return match ? Number(match[1]) : 1;
+};
 
 export const useRecords = (initialPage = 0, initialPageSize = 10) => {
     const { user } = useAuth();
@@ -38,17 +43,21 @@ export const useRecords = (initialPage = 0, initialPageSize = 10) => {
             .range(from, to);
 
         if (!error && data) {
-            const mappedData: RPHRecord[] = data.map((rec: any) => ({
-                id: rec.id,
-                user_id: rec.user_id,
-                tarikh: rec.tarikh,
-                hari: rec.hari,
-                kelas: rec.kelas,
-                masa: rec.masa,
-                subjek: rec.subjek,
-                content: rec.content || {},
-                created_at: rec.created_at
-            }));
+            const mappedData: RPHRecord[] = (data as unknown[]).map((r) => {
+                const rec = r as Record<string, unknown>;
+                return {
+                    id: String(rec.id),
+                    user_id: String(rec.user_id),
+                    tarikh: String(rec.tarikh),
+                    hari: String(rec.hari),
+                    tahun: typeof rec.tahun === 'number' ? rec.tahun : parseYearFromKelas(String(rec.kelas)),
+                    kelas: String(rec.kelas),
+                    masa: String(rec.masa),
+                    subjek: String(rec.subjek),
+                    content: (rec.content as RPHRecord['content']) || {},
+                    created_at: String(rec.created_at)
+                };
+            });
             setRecords(mappedData);
             if (count !== null) setTotalCount(count);
         }
@@ -56,7 +65,19 @@ export const useRecords = (initialPage = 0, initialPageSize = 10) => {
     }, [user, page, pageSize, searchTerm]);
 
     useEffect(() => {
-        fetchRecords();
+        let isMounted = true;
+        
+        const initialFetch = async () => {
+            if (isMounted) {
+                await fetchRecords();
+            }
+        };
+        
+        initialFetch();
+        
+        return () => {
+            isMounted = false;
+        };
     }, [fetchRecords]);
 
     const addRecord = async (record: Omit<RPHRecord, 'id'>) => {
@@ -66,6 +87,7 @@ export const useRecords = (initialPage = 0, initialPageSize = 10) => {
             user_id: user.id,
             tarikh: record.tarikh,
             hari: record.hari,
+            tahun: record.tahun,
             kelas: record.kelas,
             masa: record.masa,
             subjek: record.subjek,
@@ -90,9 +112,10 @@ export const useRecords = (initialPage = 0, initialPageSize = 10) => {
     const updateRecord = async (id: string, record: Partial<RPHRecord>) => {
         if (!user) throw new Error('User not authenticated');
 
-        const dbRecord: any = {};
+        const dbRecord: Partial<RPHRecord> = {};
         if (record.tarikh) dbRecord.tarikh = record.tarikh;
         if (record.hari) dbRecord.hari = record.hari;
+        if (record.tahun) dbRecord.tahun = record.tahun;
         if (record.kelas) dbRecord.kelas = record.kelas;
         if (record.masa) dbRecord.masa = record.masa;
         if (record.subjek) dbRecord.subjek = record.subjek;
