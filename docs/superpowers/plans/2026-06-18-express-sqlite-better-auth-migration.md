@@ -22,7 +22,7 @@ Use these API names unless the installed package contradicts them during Task 1:
 - Sessions are read server-side with `auth.api.getSession({ headers: fromNodeHeaders(req.headers) })`.
 - React client auth uses `createAuthClient` from `better-auth/react`.
 - Email auth methods are `authClient.signIn.email(...)`, `authClient.signUp.email(...)`, `authClient.signOut()`, and `authClient.changePassword(...)`.
-- Better Auth CLI supports SQLite schema generation/migration through `pnpm dlx @better-auth/cli migrate` or `pnpm dlx auth@latest migrate`; Task 1 must confirm the actual executable exposed by the installed package before scripts are finalized.
+- Better Auth CLI supports SQLite schema generation/migration through the pinned command `pnpm dlx @better-auth/cli@1.4.21 migrate`; Task 1 must confirm the actual executable exposed by the installed package before scripts are finalized.
 
 ## Scope Split
 
@@ -113,7 +113,7 @@ pnpm exec auth --help
 If that fails, run:
 
 ```bash
-pnpm dlx @better-auth/cli --help
+pnpm dlx @better-auth/cli@1.4.21 --help
 ```
 
 Record the working migration command in the verification doc.

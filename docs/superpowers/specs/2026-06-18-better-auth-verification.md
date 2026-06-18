@@ -50,5 +50,6 @@ function function function function
 ## CLI
 
 - `pnpm exec auth --help` is not available from the installed `better-auth` package.
-- Working command: `pnpm dlx @better-auth/cli --help`
-- Migration command to use after `server/auth.ts` exists: `pnpm dlx @better-auth/cli migrate`
+- `@better-auth/cli@1.6.19` does not exist on npm; the CLI package version line is separate from `better-auth`.
+- Working pinned command: `pnpm dlx @better-auth/cli@1.4.21 --help`
+- Migration command to use after `server/auth.ts` exists: `pnpm dlx @better-auth/cli@1.4.21 migrate`
