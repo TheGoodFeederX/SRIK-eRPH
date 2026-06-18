@@ -47,6 +47,19 @@ const seedRows = [
       },
     ],
   },
+  {
+    subjek: 'Bahasa Melayu',
+    tahun: 3,
+    bidang: null,
+    sk: '1.1 Mendengar dan memberikan respons',
+    sp: [
+      '1.1.1 Mendengar, mengecam sebutan, memahami, dan menyebut dengan betul dan tepat; (i) ayat tunggal (ii) ayat majmuk',
+    ],
+    spi: [
+      { tp: 1, desc: 'Memberikan respons terhadap arahan, soalan, dan pesanan pada tahap sangat terhad.' },
+      { tp: 2, desc: 'Memberikan respons terhadap arahan, soalan, dan pesanan pada tahap terhad.' },
+    ],
+  },
 ] as const;
 
 export function seedDskp(db: AppDatabase): void {

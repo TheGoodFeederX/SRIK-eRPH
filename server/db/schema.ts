@@ -13,16 +13,16 @@ export function migrateAppSchema(db: AppDatabase): void {
 
     create table if not exists rph_records (
       id text primary key,
-      user_id text references profiles(id) on delete cascade,
-      tarikh text,
-      hari text,
+      user_id text not null references profiles(id) on delete cascade,
+      tarikh text not null,
+      hari text not null,
       tahun integer not null,
-      kelas text,
-      masa text,
-      subjek text,
-      content text default '{}',
-      created_at text default (datetime('now')),
-      updated_at text default (datetime('now'))
+      kelas text not null,
+      masa text not null,
+      subjek text not null,
+      content text not null default '{}',
+      created_at text not null default CURRENT_TIMESTAMP,
+      updated_at text not null default CURRENT_TIMESTAMP
     );
 
     create table if not exists referensi_rph (
@@ -31,14 +31,14 @@ export function migrateAppSchema(db: AppDatabase): void {
       tahun integer not null,
       bidang text,
       sk text not null,
-      sp text default '[]',
-      spi text default '[]',
-      created_at text default (datetime('now')),
-      updated_at text default (datetime('now'))
+      sp text not null default '[]',
+      spi text not null default '[]',
+      created_at text not null default CURRENT_TIMESTAMP,
+      updated_at text not null default CURRENT_TIMESTAMP
     );
 
     create index if not exists idx_rph_user_date
-      on rph_records (user_id, tarikh);
+      on rph_records (user_id, tarikh desc);
 
     create index if not exists idx_referensi_lookup
       on referensi_rph (subjek, tahun, bidang, sk);

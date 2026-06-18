@@ -54,6 +54,43 @@ describe('migrateAppSchema', () => {
         .get() as { sql: string };
       expect(profilesSql.sql).toContain("role text not null check (role in ('teacher', 'admin')) default 'teacher'");
 
+      const rphColumns = db.prepare("pragma table_info('rph_records')").all() as Array<{
+        name: string;
+        notnull: 0 | 1;
+        dflt_value: string | null;
+      }>;
+      expect(rphColumns).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'user_id', notnull: 1 }),
+          expect.objectContaining({ name: 'tarikh', notnull: 1 }),
+          expect.objectContaining({ name: 'hari', notnull: 1 }),
+          expect.objectContaining({ name: 'tahun', notnull: 1 }),
+          expect.objectContaining({ name: 'kelas', notnull: 1 }),
+          expect.objectContaining({ name: 'masa', notnull: 1 }),
+          expect.objectContaining({ name: 'subjek', notnull: 1 }),
+          expect.objectContaining({ name: 'content', notnull: 1, dflt_value: "'{}'" }),
+        ]),
+      );
+
+      const rphIndexSql = db
+        .prepare("select sql from sqlite_master where type = 'index' and name = 'idx_rph_user_date'")
+        .get() as { sql: string };
+      expect(rphIndexSql.sql.toLowerCase()).toContain('tarikh desc');
+
+      const dskpColumns = db.prepare("pragma table_info('referensi_rph')").all() as Array<{
+        name: string;
+        notnull: 0 | 1;
+        dflt_value: string | null;
+      }>;
+      expect(dskpColumns).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'sp', notnull: 1, dflt_value: "'[]'" }),
+          expect.objectContaining({ name: 'spi', notnull: 1, dflt_value: "'[]'" }),
+          expect.objectContaining({ name: 'created_at', notnull: 1 }),
+          expect.objectContaining({ name: 'updated_at', notnull: 1 }),
+        ]),
+      );
+
       const rphForeignKeys = db.prepare("pragma foreign_key_list('rph_records')").all() as Array<{
         table: string;
         from: string;
