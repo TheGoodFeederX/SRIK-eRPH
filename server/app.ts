@@ -4,6 +4,7 @@ import cors from 'cors';
 import { toNodeHandler } from 'better-auth/node';
 import { createAuth } from './auth';
 import { openDatabase } from './db/connection';
+import { migrateAuthSchema } from './db/auth-schema';
 import { migrateAppSchema } from './db/schema';
 import { createAuthRoutes } from './routes/auth';
 import { errorHandler, notFound } from './routes/errors';
@@ -18,6 +19,7 @@ export function createApp(options: CreateAppOptions = {}) {
   const databasePath = options.databasePath ?? path.resolve(process.cwd(), 'data/erph.sqlite');
   const db = openDatabase(databasePath);
   migrateAppSchema(db);
+  migrateAuthSchema(db);
   const auth = createAuth(databasePath);
   const allowedOrigins = new Set(
     (process.env.CORS_ORIGIN ?? process.env.BETTER_AUTH_URL ?? 'http://localhost:5173')
