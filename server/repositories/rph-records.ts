@@ -67,9 +67,17 @@ function paginate<T>(data: T[], total: number, page: number, pageSize: number): 
   };
 }
 
+function normalizePositiveInteger(value: number, fallback: number, max = Number.MAX_SAFE_INTEGER): number {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(1, Math.trunc(value)));
+}
+
 function normalizePage(query: RphListQuery): { page: number; pageSize: number; limit: number; offset: number } {
-  const page = Math.max(1, Math.trunc(query.page));
-  const pageSize = Math.max(1, Math.trunc(query.pageSize));
+  const page = normalizePositiveInteger(query.page, 1);
+  const pageSize = normalizePositiveInteger(query.pageSize, 10, 100);
 
   return {
     page,

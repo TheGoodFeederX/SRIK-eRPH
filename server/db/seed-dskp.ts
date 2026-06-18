@@ -1,11 +1,11 @@
 import { fileURLToPath } from 'node:url';
-import { nanoid } from 'nanoid';
 import type { AppDatabase } from './connection';
 import { openDatabase } from './connection';
 import { migrateAppSchema } from './schema';
 
 const seedRows = [
   {
+    id: 'seed-pendidikan-islam-1-al-quran-1-1',
     subjek: 'Pendidikan Islam',
     tahun: 1,
     bidang: 'Al-Quran',
@@ -20,6 +20,7 @@ const seedRows = [
     ],
   },
   {
+    id: 'seed-pendidikan-islam-1-aqidah-2-1',
     subjek: 'Pendidikan Islam',
     tahun: 1,
     bidang: 'Aqidah',
@@ -31,6 +32,7 @@ const seedRows = [
     ],
   },
   {
+    id: 'seed-sains-2-kps-1-1',
     subjek: 'Sains',
     tahun: 2,
     bidang: null,
@@ -48,6 +50,7 @@ const seedRows = [
     ],
   },
   {
+    id: 'seed-bahasa-melayu-3-mendengar-1-1',
     subjek: 'Bahasa Melayu',
     tahun: 3,
     bidang: null,
@@ -66,14 +69,20 @@ export function seedDskp(db: AppDatabase): void {
   const insert = db.prepare(`
     insert into referensi_rph (id, subjek, tahun, bidang, sk, sp, spi)
     values (@id, @subjek, @tahun, @bidang, @sk, @sp, @spi)
+    on conflict(id) do update set
+      subjek = excluded.subjek,
+      tahun = excluded.tahun,
+      bidang = excluded.bidang,
+      sk = excluded.sk,
+      sp = excluded.sp,
+      spi = excluded.spi,
+      updated_at = CURRENT_TIMESTAMP
   `);
 
   const transaction = db.transaction(() => {
-    db.prepare('delete from referensi_rph').run();
-
     for (const row of seedRows) {
       insert.run({
-        id: nanoid(),
+        id: row.id,
         subjek: row.subjek,
         tahun: row.tahun,
         bidang: row.bidang,
