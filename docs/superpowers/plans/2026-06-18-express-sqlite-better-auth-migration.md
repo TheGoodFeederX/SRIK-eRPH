@@ -77,7 +77,9 @@ Modify:
 **Files:**
 - Modify: `package.json`
 - Modify: `pnpm-lock.yaml`
+- Create/Modify: `pnpm-workspace.yaml` if `pnpm approve-builds` is required for native packages.
 - Create: `docs/superpowers/specs/2026-06-18-better-auth-verification.md`
+- Create: `docs/superpowers/plans/2026-06-18-express-sqlite-better-auth-migration.md` if this generated plan has not been committed yet.
 
 - [ ] **Step 1: Install server and test dependencies**
 
@@ -159,7 +161,7 @@ Verified on 2026-06-18.
 Run:
 
 ```bash
-git add package.json pnpm-lock.yaml docs/superpowers/specs/2026-06-18-better-auth-verification.md
+git add package.json pnpm-lock.yaml pnpm-workspace.yaml docs/superpowers/specs/2026-06-18-better-auth-verification.md docs/superpowers/plans/2026-06-18-express-sqlite-better-auth-migration.md
 git commit -m "chore: verify better auth dependencies"
 ```
 
