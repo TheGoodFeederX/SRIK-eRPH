@@ -3,12 +3,13 @@ import type { ErrorRequestHandler, RequestHandler } from 'express';
 export type ApiErrorCode = 'BAD_REQUEST' | 'UNAUTHORIZED' | 'FORBIDDEN' | 'NOT_FOUND' | 'INTERNAL';
 
 export class ApiError extends Error {
-  constructor(
-    public status: number,
-    public code: ApiErrorCode,
-    message: string,
-  ) {
+  status: number;
+  code: ApiErrorCode;
+
+  constructor(status: number, code: ApiErrorCode, message: string) {
     super(message);
+    this.status = status;
+    this.code = code;
   }
 }
 
@@ -17,6 +18,8 @@ export const notFound: RequestHandler = (_req, _res, next) => {
 };
 
 export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
+  void _next;
+
   if (error instanceof ApiError) {
     return res.status(error.status).json({ error: { code: error.code, message: error.message } });
   }

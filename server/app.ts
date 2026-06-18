@@ -10,11 +10,25 @@ export interface CreateAppOptions {
 
 export function createApp(options: CreateAppOptions = {}) {
   const app = express();
+  const allowedOrigins = new Set(
+    (process.env.CORS_ORIGIN ?? process.env.BETTER_AUTH_URL ?? 'http://localhost:5173')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+  );
 
-  app.use(cors({ origin: true, credentials: true }));
+  app.use(
+    cors({
+      credentials: true,
+      origin: (origin, callback) => {
+        callback(null, !origin || allowedOrigins.has(origin));
+      },
+    }),
+  );
   app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
   app.use(express.json({ limit: '1mb' }));
+  app.use('/api', notFound);
 
   if (options.staticDir) {
     app.use(express.static(options.staticDir));
@@ -23,7 +37,6 @@ export function createApp(options: CreateAppOptions = {}) {
     });
   }
 
-  app.use('/api', notFound);
   app.use(errorHandler);
 
   return app;
