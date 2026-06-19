@@ -20,13 +20,12 @@ export function createApp(options: CreateAppOptions = {}) {
   const db = openDatabase(databasePath);
   migrateAppSchema(db);
   migrateAuthSchema(db);
-  const auth = createAuth(databasePath);
-  const allowedOrigins = new Set(
-    (process.env.CORS_ORIGIN ?? process.env.BETTER_AUTH_URL ?? 'http://localhost:5173')
-      .split(',')
-      .map((origin) => origin.trim())
-      .filter(Boolean),
-  );
+  const allowedOriginList = (process.env.CORS_ORIGIN ?? process.env.BETTER_AUTH_URL ?? 'http://localhost:5173')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const allowedOrigins = new Set(allowedOriginList);
+  const auth = createAuth(databasePath, allowedOriginList);
 
   app.use(
     cors({

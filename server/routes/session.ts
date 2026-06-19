@@ -27,7 +27,11 @@ export function requireSession(auth: AuthInstance, db: AppDatabase) {
       const existingProfile = getProfile(db, user.id);
 
       req.authUser = user;
-      req.profile = upsertProfile(db, { ...user, role: existingProfile?.role });
+      req.profile = upsertProfile(db, {
+        ...user,
+        name: existingProfile?.name ?? user.name,
+        role: existingProfile?.role,
+      });
       return next();
     } catch (error: unknown) {
       return next(error);

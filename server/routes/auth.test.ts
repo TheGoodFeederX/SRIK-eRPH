@@ -37,11 +37,14 @@ describe('auth routes', () => {
     const app = createApp({ databasePath, staticDir: null });
     const agent = request.agent(app);
 
-    const signUp = await agent.post('/api/auth/sign-up/email').send({
-      email: 'teacher@example.com',
-      password: 'password123',
-      name: 'Teacher Name',
-    });
+    const signUp = await agent
+      .post('/api/auth/sign-up/email')
+      .set('Origin', 'http://localhost:5173')
+      .send({
+        email: 'teacher@example.com',
+        password: 'password123',
+        name: 'Teacher Name',
+      });
     expect(signUp.status).toBe(200);
     expect(signUp.body.user.email).toBe('teacher@example.com');
 
@@ -70,6 +73,38 @@ describe('auth routes', () => {
     const update = await agent.patch('/api/profile').send({ name: ' Renamed Teacher ' });
     expect(update.status).toBe(200);
     expect(update.body.profile).toMatchObject({ name: 'Renamed Teacher', role: 'admin' });
+
+    const afterUpdate = await agent.get('/api/auth/me');
+    expect(afterUpdate.status).toBe(200);
+    expect(afterUpdate.body.profile).toMatchObject({ name: 'Renamed Teacher', role: 'admin' });
+  });
+
+  it('trusts the configured frontend origin for Better Auth requests', async () => {
+    const originalCorsOrigin = process.env.CORS_ORIGIN;
+    process.env.CORS_ORIGIN = 'http://app.example';
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'erph-auth-origin-'));
+    const databasePath = path.join(tempDir, 'auth.sqlite');
+
+    try {
+      const app = createApp({ databasePath, staticDir: null });
+      const response = await request(app)
+        .post('/api/auth/sign-up/email')
+        .set('Origin', 'http://app.example')
+        .send({
+          email: 'origin@example.com',
+          password: 'password123',
+          name: 'Origin Teacher',
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.user.email).toBe('origin@example.com');
+    } finally {
+      if (originalCorsOrigin === undefined) {
+        delete process.env.CORS_ORIGIN;
+      } else {
+        process.env.CORS_ORIGIN = originalCorsOrigin;
+      }
+    }
   });
 
   it('returns 400 from PATCH /api/profile with an invalid name for an authenticated session', async () => {
