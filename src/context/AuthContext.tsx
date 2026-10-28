@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import type { Profile } from '../types';
 import { AuthContext, type AuthContextType } from './authContextValue';
-import { api, errorMessage } from '../lib/apiClient';
+import { ApiError, api, errorMessage } from '../lib/apiClient';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<AuthContextType['user']>(null);
@@ -19,7 +19,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (err) {
             setUser(null);
             setProfile(null);
-            setError(errorMessage(err));
+            // 401 simply means "no session": show the login page, not a connection error.
+            setError(err instanceof ApiError && err.status === 401 ? null : errorMessage(err));
         } finally {
             setLoading(false);
         }

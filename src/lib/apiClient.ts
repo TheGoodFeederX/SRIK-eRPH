@@ -36,6 +36,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export interface SessionResponse {
     user: { id: string; email: string; name: string } | null;
     profile: Profile | null;
+    status?: Profile['status'] | null;
 }
 
 export interface Paginated<T> {

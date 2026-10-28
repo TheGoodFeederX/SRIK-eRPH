@@ -10,12 +10,14 @@ const renameSchema = z.object({ name: z.string().trim().min(1).max(120) });
 export function createProfileRoutes() {
   const router = Router();
 
-  router.get('/session', requireSession(), (req: AuthedRequest, res) => {
+  router.get('/session', requireSession({ optional: true }), (req: AuthedRequest, res) => {
+    // Anonymous callers get a 200 with nulls so a fresh browser shows the login page
+    // instead of a connection error.
     res.json({
-      user: req.authUser,
-      profile: req.profile,
-      role: req.profile?.role,
-      status: req.profile?.status,
+      user: req.authUser ?? null,
+      profile: req.profile ?? null,
+      role: req.profile?.role ?? null,
+      status: req.profile?.status ?? null,
     });
   });
 

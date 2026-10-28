@@ -27,6 +27,12 @@ describe('api auth boundary', () => {
     expect(response.body.error.code).toBe('UNAUTHORIZED');
   });
 
+  it('answers the session probe with nulls instead of 401', async () => {
+    const response = await request(app).get('/api/session');
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ user: null, profile: null });
+  });
+
   it('returns 404 for unknown api routes', async () => {
     const response = await request(app).get('/api/nope');
     expect(response.status).toBe(404);

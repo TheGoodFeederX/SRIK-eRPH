@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthProvider } from './AuthContext';
 import { useAuth } from '../hooks/useAuth';
-import { api } from '../lib/apiClient';
+import { ApiError, api } from '../lib/apiClient';
 
 vi.mock('../lib/apiClient', async () => {
   const actual = await vi.importActual<typeof import('../lib/apiClient')>('../lib/apiClient');
@@ -18,6 +18,18 @@ const Probe = () => {
 describe('AuthProvider', () => {
   it('renders consumers without throwing and exposes an empty session (audit F-01)', async () => {
     vi.mocked(api.session).mockResolvedValue({ user: null, profile: null });
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByText('no-session')).toBeTruthy());
+  });
+
+  it('shows the login page instead of a connection error when the session is absent (401)', async () => {
+    vi.mocked(api.session).mockRejectedValue(new ApiError(401, { code: 'UNAUTHORIZED', message: 'Sesi tamat.' }));
 
     render(
       <AuthProvider>

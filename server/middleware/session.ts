@@ -27,13 +27,17 @@ export function readSessionToken(req: Request): string | null {
   return null;
 }
 
-/** Resolves the Neon Auth session and the application membership row. */
-export function requireSession() {
+/**
+ * Resolves the Neon Auth session and the application membership row.
+ * `optional` is for probes like `/api/session`, where "no session" is a valid answer.
+ */
+export function requireSession(options: { optional?: boolean } = {}) {
   return async (req: AuthedRequest, _res: Response, next: NextFunction) => {
     try {
       const token = readSessionToken(req);
       const user = await neonAuth.getSession(token);
       if (!token || !user) {
+        if (options.optional) return next();
         return next(new ApiError(401, 'UNAUTHORIZED', 'Sesi tamat. Sila log masuk semula.'));
       }
 
