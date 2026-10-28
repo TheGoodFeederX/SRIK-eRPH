@@ -31,8 +31,8 @@ Rujukan: `Audit-Keselamatan-Kefungsian-SRIK-eRPH-2026-10-27.md`.
 
 ## Belum selesai (perlu tindakan pemilik)
 
-1. **Trusted origins Neon Auth** — API pengurusan yang tersedia tidak mendedahkan endpoint
-   konfigurasi, jadi domain Vercel mesti ditambah melalui Neon Console → Auth.
+1. ~~Trusted origins Neon Auth~~ — **selesai**: `https://srik-erph.vercel.app` disahkan
+   dalam `neon_auth.project_config.trusted_origins`; daftar/log masuk produksi diuji (200).
 2. **`pdfmake` 0.3.5** — semak versi baharu yang menampal GHSA-wp52-r2fp-4vmr.
 3. **CI (GitHub Actions)** dan ujian E2E Playwright untuk aliran login → rekod → PDF.
 4. **Migrasi data legasi** — jika ada data Supabase/SQLite sebenar, eksport dan import

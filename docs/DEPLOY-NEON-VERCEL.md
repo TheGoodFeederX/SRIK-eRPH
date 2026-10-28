@@ -40,7 +40,9 @@ awalan itu dibakar ke dalam bundle pelayar (audit TC-NEON-SECRET-01).
 
 ## 3. Selepas deploy
 
-1. Neon Console → Auth → **Trusted origins** tambah domain Vercel.
+1. Neon Console → Auth → **Trusted origins**: tambah setiap domain deploy baharu
+   (`https://srik-erph.vercel.app` sudah didaftarkan). Preview deployment URL juga perlu
+ditambah jika mahu login dari preview.
 2. Daftar akaun pentadbir melalui UI, kemudian `pnpm seed:admin <email>` dengan
    `DATABASE_URL` produksi.
 3. Semak: `curl https://<projek>.vercel.app/api/health` → `{"ok":true}`.
