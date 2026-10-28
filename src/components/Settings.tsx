@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
-import { useAuth } from './AuthContext';
+import { api, errorMessage } from '../lib/apiClient';
+import { useAuth } from '../hooks/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, User, CheckCircle, AlertCircle, Loader2, Save } from 'lucide-react';
 
 export const Settings: React.FC = () => {
-    const { user } = useAuth();
+    const { profile, user, refresh, signOut } = useAuth();
     const [passwordLoading, setPasswordLoading] = useState(false);
     const [nameLoading, setNameLoading] = useState(false);
 
@@ -17,12 +17,7 @@ export const Settings: React.FC = () => {
     const [passwordSuccess, setPasswordSuccess] = useState(false);
 
     // Username/Name change state
-    const [username, setUsername] = useState(
-        user?.user_metadata?.full_name ||
-        user?.user_metadata?.name ||
-        user?.email?.split('@')[0] ||
-        ''
-    );
+    const [username, setUsername] = useState(profile?.name || user?.name || '');
     const [nameError, setNameError] = useState<string | null>(null);
     const [nameSuccess, setNameSuccess] = useState(false);
 
@@ -36,8 +31,8 @@ export const Settings: React.FC = () => {
             return;
         }
 
-        if (newPassword.length < 6) {
-            setPasswordError('Kata laluan baru mestilah sekurang-kurangnya 6 aksara.');
+        if (newPassword.length < 8) {
+            setPasswordError('Kata laluan baru mestilah sekurang-kurangnya 8 aksara.');
             return;
         }
 
@@ -54,29 +49,18 @@ export const Settings: React.FC = () => {
         setPasswordLoading(true);
 
         try {
-            // Update password using Supabase
-            const { error } = await supabase.auth.updateUser({
-                password: newPassword
-            });
-
-            if (error) {
-                console.error('Password update error', error);
-                setPasswordError(error.message || 'Gagal menukar kata laluan. Sila cuba lagi.');
-                return;
-            }
-
+            // The server verifies the current password with Neon Auth before changing it (audit S-05).
+            await api.changePassword(currentPassword, newPassword);
             setPasswordSuccess(true);
             setCurrentPassword('');
             setNewPassword('');
             setConfirmPassword('');
-
-            // Clear success message after 3 seconds
+            // Sessions are revoked after a password change: sign in again.
             setTimeout(() => {
-                setPasswordSuccess(false);
-            }, 3000);
-        } catch (err: any) {
-            console.error('Password change error', err);
-            setPasswordError(err.message || 'Ralat berlaku semasa menukar kata laluan.');
+                void signOut();
+            }, 2000);
+        } catch (err: unknown) {
+            setPasswordError(errorMessage(err));
         } finally {
             setPasswordLoading(false);
         }
@@ -95,30 +79,11 @@ export const Settings: React.FC = () => {
         setNameLoading(true);
 
         try {
-            // Update user metadata with the new name
-            const { error } = await supabase.auth.updateUser({
-                data: {
-                    full_name: username.trim(),
-                    name: username.trim()
-                }
-            });
-
-            if (error) {
-                console.error('Name update error', error);
-                setNameError(error.message || 'Gagal menukar nama. Sila cuba lagi.');
-                return;
-            }
-
+            await api.rename(username.trim());
+            await refresh();
             setNameSuccess(true);
-
-            // Reload the page to refresh user data in AuthContext
-            // The auth state change should handle this, but we'll reload to be sure
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
-        } catch (err: any) {
-            console.error('Name change error', err);
-            setNameError(err.message || 'Ralat berlaku semasa menukar nama.');
+        } catch (err: unknown) {
+            setNameError(errorMessage(err));
         } finally {
             setNameLoading(false);
         }

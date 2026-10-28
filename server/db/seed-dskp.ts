@@ -1,11 +1,12 @@
-import { fileURLToPath } from 'node:url';
-import type { AppDatabase } from './connection';
-import { openDatabase } from './connection';
-import { migrateAppSchema } from './schema';
+import 'dotenv/config';
+import { pool, withPrivileged } from './pool.js';
 
-const seedRows = [
+/**
+ * Idempotent DSKP seed. Never truncates and never overwrites edited rows
+ * (audit D-02): conflicts on the natural key (subjek, tahun, bidang, sk) are ignored.
+ */
+const rows = [
   {
-    id: 'seed-pendidikan-islam-1-al-quran-1-1',
     subjek: 'Pendidikan Islam',
     tahun: 1,
     bidang: 'Al-Quran',
@@ -20,7 +21,6 @@ const seedRows = [
     ],
   },
   {
-    id: 'seed-pendidikan-islam-1-aqidah-2-1',
     subjek: 'Pendidikan Islam',
     tahun: 1,
     bidang: 'Aqidah',
@@ -32,83 +32,53 @@ const seedRows = [
     ],
   },
   {
-    id: 'seed-sains-2-kps-1-1',
     subjek: 'Sains',
     tahun: 2,
     bidang: null,
     sk: '1.1 Kemahiran Proses Sains',
     sp: ['1.1.1 Memerhati', '1.1.2 Mengelas', '1.1.3 Mengukur dan menggunakan nombor'],
     spi: [
-      {
-        tp: 1,
-        desc: 'Menyatakan semua deria yang terlibat untuk membuat pemerhatian tentang fenomena atau perubahan yang berlaku',
-      },
-      {
-        tp: 2,
-        desc: 'Memerihalkan penggunaan semua deria yang terlibat untuk membuat pemerhatian tentang fenomena atau perubahan yang berlaku',
-      },
+      { tp: 1, desc: 'Menyatakan semua deria yang terlibat untuk membuat pemerhatian tentang fenomena atau perubahan yang berlaku' },
+      { tp: 2, desc: 'Memerihalkan penggunaan semua deria yang terlibat untuk membuat pemerhatian tentang fenomena atau perubahan yang berlaku' },
     ],
   },
   {
-    id: 'seed-bahasa-melayu-3-mendengar-1-1',
     subjek: 'Bahasa Melayu',
     tahun: 3,
     bidang: null,
     sk: '1.1 Mendengar dan memberikan respons',
-    sp: [
-      '1.1.1 Mendengar, mengecam sebutan, memahami, dan menyebut dengan betul dan tepat; (i) ayat tunggal (ii) ayat majmuk',
-    ],
+    sp: ['1.1.1 Mendengar, mengecam sebutan, memahami, dan menyebut dengan betul dan tepat; (i) ayat tunggal (ii) ayat majmuk'],
     spi: [
       { tp: 1, desc: 'Memberikan respons terhadap arahan, soalan, dan pesanan pada tahap sangat terhad.' },
       { tp: 2, desc: 'Memberikan respons terhadap arahan, soalan, dan pesanan pada tahap terhad.' },
     ],
   },
-] as const;
+];
 
-export function seedDskp(db: AppDatabase): void {
-  const insert = db.prepare(`
-    insert into referensi_rph (id, subjek, tahun, bidang, sk, sp, spi)
-    values (@id, @subjek, @tahun, @bidang, @sk, @sp, @spi)
-    on conflict(id) do update set
-      subjek = excluded.subjek,
-      tahun = excluded.tahun,
-      bidang = excluded.bidang,
-      sk = excluded.sk,
-      sp = excluded.sp,
-      spi = excluded.spi,
-      updated_at = CURRENT_TIMESTAMP
-  `);
+async function main() {
+  const applied = await withPrivileged(async (db) => {
+    const keys: string[] = [];
 
-  const transaction = db.transaction(() => {
-    for (const row of seedRows) {
-      insert.run({
-        id: row.id,
-        subjek: row.subjek,
-        tahun: row.tahun,
-        bidang: row.bidang,
-        sk: row.sk,
-        sp: JSON.stringify(row.sp),
-        spi: JSON.stringify(row.spi),
-      });
+    for (const row of rows) {
+      const result = await db.query<{ id: string }>(
+        `insert into public.referensi_rph (subjek, tahun, bidang, sk, sp, spi)
+         values ($1, $2, $3, $4, $5, $6)
+         on conflict (subjek, tahun, (coalesce(bidang, '')), sk) do nothing
+         returning id`,
+        [row.subjek, row.tahun, row.bidang, row.sk, JSON.stringify(row.sp), JSON.stringify(row.spi)],
+      );
+      keys.push(result.rows[0] ? `added:${row.subjek}/${row.sk}` : `exists:${row.subjek}/${row.sk}`);
     }
+
+    return keys;
   });
 
-  transaction();
+  console.log(applied.join('\n'));
 }
 
-function isDirectRun(): boolean {
-  return process.argv[1] === fileURLToPath(import.meta.url);
-}
-
-if (isDirectRun()) {
-  const databasePath = process.env.DATABASE_PATH ?? 'data/erph.sqlite';
-  const db = openDatabase(databasePath);
-
-  try {
-    migrateAppSchema(db);
-    seedDskp(db);
-    console.log(`Seeded ${seedRows.length} DSKP rows into ${databasePath}.`);
-  } finally {
-    db.close();
-  }
-}
+main()
+  .catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(() => pool.end());

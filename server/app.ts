@@ -1,61 +1,44 @@
-import path from 'node:path';
 import express from 'express';
 import cors from 'cors';
-import { toNodeHandler } from 'better-auth/node';
-import { createAuth } from './auth';
-import { openDatabase } from './db/connection';
-import { migrateAuthSchema } from './db/auth-schema';
-import { migrateAppSchema } from './db/schema';
-import { createAuthRoutes } from './routes/auth';
-import { errorHandler, notFound } from './routes/errors';
+import { errorHandler, notFound } from './lib/http.js';
+import { createAdminRoutes } from './routes/admin.js';
+import { createAuthRoutes } from './routes/auth.js';
+import { createDskpRoutes } from './routes/dskp.js';
+import { createProfileRoutes } from './routes/profile.js';
+import { createRecordRoutes } from './routes/records.js';
 
-export interface CreateAppOptions {
-  databasePath?: string;
-  staticDir?: string | null;
-}
-
-export function createApp(options: CreateAppOptions = {}) {
+export function createApp() {
   const app = express();
-  const databasePath = options.databasePath ?? path.resolve(process.cwd(), 'data/erph.sqlite');
-  const db = openDatabase(databasePath);
-  migrateAppSchema(db);
-  migrateAuthSchema(db);
-  const allowedOriginList = (process.env.CORS_ORIGIN ?? process.env.BETTER_AUTH_URL ?? 'http://localhost:5173')
+
+  const allowedOrigins = (process.env.CORS_ORIGIN ?? process.env.APP_ORIGIN ?? 'http://localhost:5173')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
-  const allowedOrigins = new Set(allowedOriginList);
-  const auth = createAuth(databasePath, allowedOriginList);
 
+  app.disable('x-powered-by');
   app.use(
     cors({
       credentials: true,
-      origin: (origin, callback) => {
-        callback(null, !origin || allowedOrigins.has(origin));
-      },
+      origin: (origin, callback) => callback(null, !origin || allowedOrigins.includes(origin)),
     }),
   );
-  const authHandler = toNodeHandler(auth);
-  app.all('/api/auth/{*any}', (req, res, next) => {
-    if (req.path === '/api/auth/me') {
-      return next();
-    }
+  app.use(express.json({ limit: '1mb' }));
 
-    return authHandler(req, res);
+  app.use((_req, res, next) => {
+    res.setHeader('x-content-type-options', 'nosniff');
+    res.setHeader('referrer-policy', 'strict-origin-when-cross-origin');
+    res.setHeader('x-frame-options', 'DENY');
+    next();
   });
+
   app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
-  app.use(express.json({ limit: '1mb' }));
-  app.use('/api', createAuthRoutes(auth, db));
+  app.use('/api', createAuthRoutes());
+  app.use('/api', createProfileRoutes());
+  app.use('/api', createRecordRoutes());
+  app.use('/api', createDskpRoutes());
+  app.use('/api', createAdminRoutes());
   app.use('/api', notFound);
-
-  if (options.staticDir) {
-    app.use(express.static(options.staticDir));
-    app.get('/{*splat}', (_req, res) => {
-      res.sendFile(path.join(options.staticDir as string, 'index.html'));
-    });
-  }
-
   app.use(errorHandler);
 
   return app;

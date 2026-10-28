@@ -1,73 +1,67 @@
-# React + TypeScript + Vite
+# SRIK-eRPH
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Rekod Pengajaran Harian (eRPH) digital untuk guru — React + TypeScript + Vite, dengan
+API Express dan pangkalan data **Neon PostgreSQL** serta identiti **Neon Managed Auth**.
 
-Currently, two official plugins are available:
+## Seni bina
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```text
+Pelayar (SPA Vite di Vercel)
+   |  cookie sesi HttpOnly (same-origin)
+   v
+/api/*  — Express 5 (Vercel serverless / Node)
+   |            |
+   |            +--> Neon Managed Auth  (login, daftar, tukar kata laluan, sesi)
+   v
+Neon PostgreSQL
+   public.profiles        (role + status keahlian)
+   public.rph_records     (RLS: pemilik sahaja)
+   public.referensi_rph   (RLS: baca ahli aktif, tulis admin)
+   public.audit_events    (log tindakan admin)
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+* Semua pertanyaan aplikasi berjalan sebagai role `app_user` dengan `app.user_id` ditetapkan,
+  jadi RLS PostgreSQL menolak akses silang pengguna walaupun kod API tersilap.
+* Akaun baharu berstatus `pending` sehingga pentadbir meluluskan (tab `Pengguna`).
+* Tiada token atau secret dalam `localStorage`; tiada `DATABASE_URL` dalam bundle pelayar.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Pembangunan tempatan
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm install
+cp .env.example .env          # isi DATABASE_URL, NEON_AUTH_BASE_URL
+pnpm db:migrate               # skema Neon (idempoten)
+pnpm seed:dskp                # data rujukan DSKP (idempoten, tiada truncate)
+pnpm dev                      # Vite :5173 + API :3005
 ```
+
+Akaun pentadbir pertama:
+
+```bash
+# 1. Daftar melalui halaman login, kemudian:
+pnpm seed:admin cikgu@sekolah.edu.my
+```
+
+## Arahan
+
+| Arahan | Fungsi |
+|---|---|
+| `pnpm dev` | Klien Vite + API (proxy `/api` → `:3005`) |
+| `pnpm build` | Typecheck (`tsc -b`) + bundle klien |
+| `pnpm test` | Vitest: unit + sempadan auth API + ujian RLS Neon |
+| `pnpm lint` | ESLint |
+| `pnpm db:migrate` | Jalankan `server/db/sql/*.sql` |
+| `pnpm seed:dskp` | Seed DSKP idempoten |
+| `pnpm seed:admin <email>` | Naik taraf akaun sedia ada kepada admin aktif |
+| `pnpm server` | API sahaja (Node, `tsx`) |
+
+`pnpm test` memerlukan `DATABASE_URL` untuk ujian RLS; tanpanya ujian itu dilangkau.
+
+## Deploy
+
+Lihat [`docs/DEPLOY-NEON-VERCEL.md`](docs/DEPLOY-NEON-VERCEL.md).
+Pembetulan audit dipetakan dalam [`docs/AUDIT-REMEDIATION.md`](docs/AUDIT-REMEDIATION.md).
+
+## Hak cipta
+
+© eRPH SRI Al-Khairiah. Dibina oleh Cikgu Najmi.

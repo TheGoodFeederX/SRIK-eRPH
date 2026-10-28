@@ -1,7 +1,7 @@
 import * as pdfMake from 'pdfmake/build/pdfmake';
 import type { RPHRecord } from '../types';
 import { processJawi, processJawiArray } from './jawiUtils';
-import type { TDocumentDefinitions, TFontDictionary } from 'pdfmake/interfaces';
+import type { TableCell, TDocumentDefinitions, TFontDictionary } from 'pdfmake/interfaces';
 
 // Font configuration
 const fonts: TFontDictionary = {
@@ -184,7 +184,7 @@ function createRPHDocDefinition(record: RPHRecord): TDocumentDefinitions {
                         [{ text: 'OBJEKTIF', style: 'label' }, { text: objektif, style: ['cell', 'jawiText'] }],
                         [{ text: 'AKTIVITI', style: 'label' }, { text: aktiviti, style: ['cell', 'jawiText'] }],
                         [{ text: 'REFLEKSI', style: 'label' }, { text: refleksi || '-', style: ['cell', 'jawiText'] }]
-                    ].filter(row => row.length > 0)
+                    ].filter(row => row.length > 0) as unknown as TableCell[][]
                 },
                 margin: [0, 0, 0, 20]
             },

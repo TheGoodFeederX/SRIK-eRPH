@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { api, errorMessage } from '../lib/apiClient';
 import { type ReferensiRPH } from '../types';
 import {
     Plus, Search, Edit2, Trash2, X, Save, AlertCircle,
     ChevronLeft, ChevronRight, Loader2, CheckCircle2,
-    Inbox, Filter
+    Inbox
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -14,19 +14,17 @@ interface Toast {
     type: 'success' | 'error';
 }
 
-export const DSKPManager: React.FC = () => {
+export const DSKPManager: React.FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
     const [records, setRecords] = useState<ReferensiRPH[]>([]);
     const [loading, setLoading] = useState(true);
     const [toasts, setToasts] = useState<Toast[]>([]);
 
-    // Filter states
-    const [filterSubjek, setFilterSubjek] = useState('');
+    // Filter + server-side pagination state
+    const [search, setSearch] = useState('');
     const [filterTahun, setFilterTahun] = useState('');
-    const [filterSK, setFilterSK] = useState('');
-
-    // Pagination states
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [totalCount, setTotalCount] = useState(0);
 
     // Modal states
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -37,20 +35,23 @@ export const DSKPManager: React.FC = () => {
     const [formData, setFormData] = useState({
         subjek: '',
         tahun: '' as string | number,
-        sk: ''
+        bidang: '',
+        sk: '',
+        sp: [''] as string[],
+        spi: [] as Array<{ tp: number; desc: string }>,
     });
     const [isAddingNewSubjek, setIsAddingNewSubjek] = useState(false);
     const [isAddingNewTahun, setIsAddingNewTahun] = useState(false);
     const [currentRecord, setCurrentRecord] = useState<ReferensiRPH | null>(null);
 
     useEffect(() => {
-        fetchRecords();
-    }, []);
+        void fetchRecords();
+    }, [currentPage, itemsPerPage, search, filterTahun]);
 
     // Reset page when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [filterSubjek, filterTahun, filterSK, itemsPerPage]);
+    }, [search, filterTahun, itemsPerPage]);
 
     // Unique lists for dropdowns
     const uniqueSubjects = useMemo(() => {
@@ -74,65 +75,59 @@ export const DSKPManager: React.FC = () => {
     const fetchRecords = async () => {
         try {
             setLoading(true);
-            let allData: ReferensiRPH[] = [];
-            let from = 0;
-            const step = 1000;
-            let more = true;
-
-            while (more) {
-                const { data, error } = await supabase
-                    .from('referensi_rph')
-                    .select('*')
-                    .order('subjek', { ascending: true })
-                    .order('tahun', { ascending: true })
-                    .order('sk', { ascending: true })
-                    .range(from, from + step - 1);
-
-                if (error) throw error;
-
-                if (data) {
-                    allData = [...allData, ...data];
-                    if (data.length < step) {
-                        more = false;
-                    } else {
-                        from += step;
-                    }
-                } else {
-                    more = false;
-                }
-            }
-
-            setRecords(allData);
+            const result = await api.listDskp({
+                page: currentPage,
+                pageSize: itemsPerPage,
+                search: search.trim() || undefined,
+                tahun: filterTahun ? Number(filterTahun) : undefined,
+            });
+            setRecords(result.data);
+            setTotalCount(result.totalCount);
         } catch (error) {
-            console.error('Error fetching records:', error);
-            addToast('Gagal memuat turun rekod DSKP.', 'error');
+            addToast(errorMessage(error), 'error');
         } finally {
             setLoading(false);
         }
     };
 
+    const reload = async () => {
+        if (currentPage !== 1) {
+            setCurrentPage(1);
+        } else {
+            await fetchRecords();
+        }
+    };
+
+    const payload = () => ({
+        subjek: formData.subjek.trim(),
+        tahun: Number(formData.tahun),
+        bidang: formData.bidang.trim() || null,
+        sk: formData.sk.trim(),
+        sp: formData.sp.map((item) => item.trim()).filter(Boolean),
+        spi: formData.spi.filter((item) => item.desc.trim()),
+    });
+
+    const resetForm = () => {
+        setFormData({ subjek: '', tahun: '', bidang: '', sk: '', sp: [''], spi: [] });
+        setIsAddingNewSubjek(false);
+        setIsAddingNewTahun(false);
+    };
+
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const { error } = await supabase
-                .from('referensi_rph')
-                .insert([{
-                    subjek: formData.subjek,
-                    tahun: formData.tahun ? parseInt(formData.tahun.toString()) : null,
-                    sk: formData.sk
-                }]);
+            const body = payload();
+            if (body.sp.length === 0) {
+                throw new Error('Sekurang-kurangnya satu Standard Pembelajaran diperlukan.');
+            }
 
-            if (error) throw error;
-
-            await fetchRecords();
+            await api.createDskp(body);
+            await reload();
             setIsAddModalOpen(false);
-            setFormData({ subjek: '', tahun: '', sk: '' });
-            setIsAddingNewSubjek(false);
-            setIsAddingNewTahun(false);
-            addToast('Rekod berjaya ditambah!', 'success');
+            resetForm();
+            addToast('Rekod DSKP berjaya ditambah!', 'success');
         } catch (error) {
-            console.error('Error adding record:', error);
-            addToast('Gagal menambah rekod.', 'error');
+            addToast(errorMessage(error), 'error');
         }
     };
 
@@ -141,27 +136,19 @@ export const DSKPManager: React.FC = () => {
         if (!currentRecord) return;
 
         try {
-            const { error } = await supabase
-                .from('referensi_rph')
-                .update({
-                    subjek: formData.subjek,
-                    tahun: formData.tahun ? parseInt(formData.tahun.toString()) : null,
-                    sk: formData.sk
-                })
-                .eq('id', currentRecord.id);
+            const body = payload();
+            if (body.sp.length === 0) {
+                throw new Error('Sekurang-kurangnya satu Standard Pembelajaran diperlukan.');
+            }
 
-            if (error) throw error;
-
-            await fetchRecords();
+            await api.updateDskp(currentRecord.id, body);
+            await reload();
             setIsEditModalOpen(false);
             setCurrentRecord(null);
-            setFormData({ subjek: '', tahun: '', sk: '' });
-            setIsAddingNewSubjek(false);
-            setIsAddingNewTahun(false);
-            addToast('Rekod berjaya dikemaskini!', 'success');
+            resetForm();
+            addToast('Rekod DSKP berjaya dikemaskini!', 'success');
         } catch (error) {
-            console.error('Error updating record:', error);
-            addToast('Gagal mengemaskini rekod.', 'error');
+            addToast(errorMessage(error), 'error');
         }
     };
 
@@ -169,24 +156,12 @@ export const DSKPManager: React.FC = () => {
         if (!recordToDelete) return;
 
         try {
-            const { data, error } = await supabase
-                .from('referensi_rph')
-                .delete()
-                .eq('id', recordToDelete.id)
-                .select();
-
-            if (error) throw error;
-
-            if (!data || data.length === 0) {
-                throw new Error('Rekod tidak dapat dipadam. Sila pastikan anda mempunyai kebenaran.');
-            }
-
-            await fetchRecords();
+            await api.deleteDskp(recordToDelete.id);
+            await reload();
             setRecordToDelete(null);
-            addToast('Rekod berjaya dipadam!', 'success');
+            addToast('Rekod DSKP berjaya dipadam!', 'success');
         } catch (error) {
-            console.error('Error deleting record:', error);
-            addToast('Gagal memadam rekod.', 'error');
+            addToast(errorMessage(error), 'error');
         }
     };
 
@@ -195,27 +170,18 @@ export const DSKPManager: React.FC = () => {
         setFormData({
             subjek: record.subjek,
             tahun: record.tahun || '',
-            sk: record.sk
+            bidang: record.bidang ?? '',
+            sk: record.sk,
+            sp: record.sp.length ? record.sp : [''],
+            spi: record.spi,
         });
         setIsAddingNewSubjek(false);
         setIsAddingNewTahun(false);
         setIsEditModalOpen(true);
     };
 
-    // Filter Logic
-    const filteredRecords = records.filter(r => {
-        const matchSubjek = r.subjek.toLowerCase().includes(filterSubjek.toLowerCase());
-        const matchTahun = filterTahun === '' || (r.tahun && r.tahun.toString() === filterTahun);
-        const matchSK = r.sk.toLowerCase().includes(filterSK.toLowerCase());
-        return matchSubjek && matchTahun && matchSK;
-    });
-
-    // Pagination Logic
-    const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
-    const paginatedRecords = filteredRecords.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-    );
+    const totalPages = Math.max(1, Math.ceil(totalCount / itemsPerPage));
+    const paginatedRecords = records;
 
     return (
         <motion.div
@@ -243,11 +209,10 @@ export const DSKPManager: React.FC = () => {
                             Urus Subjek dan Standard Kandungan
                         </p>
                     </div>
+                    {isAdmin && (
                     <button
                         onClick={() => {
-                            setFormData({ subjek: '', tahun: '', sk: '' });
-                            setIsAddingNewSubjek(false);
-                            setIsAddingNewTahun(false);
+                            resetForm();
                             setIsAddModalOpen(true);
                         }}
                         style={{
@@ -276,6 +241,7 @@ export const DSKPManager: React.FC = () => {
                     >
                         <Plus size={20} /> Tambah Rekod
                     </button>
+                    )}
                 </div>
 
                 <div style={{
@@ -311,7 +277,7 @@ export const DSKPManager: React.FC = () => {
                             }} size={18} />
                             <input
                                 type="text"
-                                placeholder="Cari subjek..."
+                                placeholder="Cari subjek, SK atau bidang..."
                                 style={{
                                     width: '100%',
                                     paddingLeft: '3rem',
@@ -325,8 +291,8 @@ export const DSKPManager: React.FC = () => {
                                     transition: 'all 0.2s ease',
                                     outline: 'none'
                                 }}
-                                value={filterSubjek}
-                                onChange={(e) => setFilterSubjek(e.target.value)}
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
                                 onFocus={(e) => {
                                     e.currentTarget.style.borderColor = 'var(--primary)';
                                     e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20, 133, 63, 0.1)';
@@ -378,55 +344,6 @@ export const DSKPManager: React.FC = () => {
                                 <option key={t} value={t}>Tahun {t}</option>
                             ))}
                         </select>
-                    </div>
-                    <div>
-                        <label style={{
-                            display: 'block',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            color: '#64748b',
-                            marginBottom: '0.625rem',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.05em'
-                        }}>
-                            Standard Kandungan
-                        </label>
-                        <div style={{ position: 'relative' }}>
-                            <Filter style={{
-                                position: 'absolute',
-                                left: '1rem',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                color: '#94a3b8'
-                            }} size={18} />
-                            <input
-                                type="text"
-                                placeholder="Cari SK..."
-                                style={{
-                                    width: '100%',
-                                    paddingLeft: '3rem',
-                                    paddingRight: '1rem',
-                                    paddingTop: '0.75rem',
-                                    paddingBottom: '0.75rem',
-                                    borderRadius: '0.75rem',
-                                    border: '1.5px solid #e2e8f0',
-                                    fontSize: '0.95rem',
-                                    backgroundColor: 'white',
-                                    transition: 'all 0.2s ease',
-                                    outline: 'none'
-                                }}
-                                value={filterSK}
-                                onChange={(e) => setFilterSK(e.target.value)}
-                                onFocus={(e) => {
-                                    e.currentTarget.style.borderColor = 'var(--primary)';
-                                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20, 133, 63, 0.1)';
-                                }}
-                                onBlur={(e) => {
-                                    e.currentTarget.style.borderColor = '#e2e8f0';
-                                    e.currentTarget.style.boxShadow = 'none';
-                                }}
-                            />
-                        </div>
                     </div>
                 </div>
 
@@ -519,7 +436,7 @@ export const DSKPManager: React.FC = () => {
                                             </div>
                                         </td>
                                     </tr>
-                                ) : filteredRecords.length === 0 ? (
+                                ) : records.length === 0 ? (
                                     <tr>
                                         <td colSpan={4} style={{
                                             textAlign: 'center',
@@ -580,6 +497,10 @@ export const DSKPManager: React.FC = () => {
                                             </td>
                                             <td style={{ padding: '1.25rem 1.5rem', textAlign: 'right' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.625rem' }}>
+                                                    {!isAdmin && (
+                                                        <span style={{ fontSize: '0.8rem', color: '#94a3b8', alignSelf: 'center' }}>Baca sahaja</span>
+                                                    )}
+                                                    {isAdmin && (<>
                                                     <button
                                                         onClick={() => openEditModal(record)}
                                                         style={{
@@ -636,6 +557,7 @@ export const DSKPManager: React.FC = () => {
                                                     >
                                                         <Trash2 size={17} />
                                                     </button>
+                                                    </>)}
                                                 </div>
                                             </td>
                                         </motion.tr>
@@ -646,7 +568,7 @@ export const DSKPManager: React.FC = () => {
                     </table>
                 </div>
 
-                {!loading && filteredRecords.length > 0 && (
+                {!loading && records.length > 0 && (
                     <div style={{
                         display: 'flex',
                         flexDirection: 'row',
@@ -686,7 +608,7 @@ export const DSKPManager: React.FC = () => {
                                 <option value={50}>50</option>
                                 <option value={100}>100</option>
                             </select>
-                            <span>dari <strong style={{ color: '#0f172a' }}>{filteredRecords.length}</strong> rekod</span>
+                            <span>dari <strong style={{ color: '#0f172a' }}>{totalCount}</strong> rekod</span>
                         </div>
 
                         <div style={{
@@ -893,6 +815,16 @@ export const DSKPManager: React.FC = () => {
                                 </div>
 
                                 <div className="input-group">
+                                    <label>Bidang (pilihan)</label>
+                                    <input
+                                        type="text"
+                                        value={formData.bidang}
+                                        onChange={e => setFormData({ ...formData, bidang: e.target.value })}
+                                        placeholder="Contoh: Al-Quran"
+                                    />
+                                </div>
+
+                                <div className="input-group">
                                     <label>Standard Kandungan (SK)</label>
                                     <textarea
                                         required
@@ -902,6 +834,87 @@ export const DSKPManager: React.FC = () => {
                                         placeholder="Masukkan butiran SK..."
                                         style={{ resize: 'vertical' }}
                                     />
+                                </div>
+
+                                <div className="input-group">
+                                    <label>Standard Pembelajaran (SP) — sekurang-kurangnya satu</label>
+                                    {formData.sp.map((item, index) => (
+                                        <div key={index} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                            <input
+                                                type="text"
+                                                required
+                                                value={item}
+                                                placeholder={`SP ${index + 1}`}
+                                                onChange={(e) => {
+                                                    const next = [...formData.sp];
+                                                    next[index] = e.target.value;
+                                                    setFormData({ ...formData, sp: next });
+                                                }}
+                                            />
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline"
+                                                style={{ padding: '0.5rem', color: '#ef4444' }}
+                                                title="Buang SP"
+                                                onClick={() => setFormData({ ...formData, sp: formData.sp.filter((_, i) => i !== index) })}
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline"
+                                        onClick={() => setFormData({ ...formData, sp: [...formData.sp, ''] })}
+                                    >
+                                        <Plus size={16} /> Tambah SP
+                                    </button>
+                                </div>
+
+                                <div className="input-group">
+                                    <label>Standard Prestasi (SPI) — pilihan</label>
+                                    {formData.spi.map((item, index) => (
+                                        <div key={index} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                style={{ maxWidth: '90px' }}
+                                                value={item.tp}
+                                                aria-label={`TP ${index + 1}`}
+                                                onChange={(e) => {
+                                                    const next = [...formData.spi];
+                                                    next[index] = { ...next[index], tp: Number(e.target.value) };
+                                                    setFormData({ ...formData, spi: next });
+                                                }}
+                                            />
+                                            <input
+                                                type="text"
+                                                value={item.desc}
+                                                placeholder="Huraian tahap penguasaan"
+                                                onChange={(e) => {
+                                                    const next = [...formData.spi];
+                                                    next[index] = { ...next[index], desc: e.target.value };
+                                                    setFormData({ ...formData, spi: next });
+                                                }}
+                                            />
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline"
+                                                style={{ padding: '0.5rem', color: '#ef4444' }}
+                                                title="Buang SPI"
+                                                onClick={() => setFormData({ ...formData, spi: formData.spi.filter((_, i) => i !== index) })}
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline"
+                                        onClick={() => setFormData({ ...formData, spi: [...formData.spi, { tp: formData.spi.length + 1, desc: '' }] })}
+                                    >
+                                        <Plus size={16} /> Tambah SPI
+                                    </button>
                                 </div>
 
                                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>

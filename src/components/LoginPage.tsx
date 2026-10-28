@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogIn, UserPlus, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react';
+import { LogIn, UserPlus, Mail, Lock, User, AlertCircle, Loader2 } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
+import { errorMessage } from '../lib/apiClient';
 
 export const LoginPage: React.FC = () => {
+    const { login, register } = useAuth();
     const [isLogin, setIsLogin] = useState(true);
+    const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -19,42 +22,16 @@ export const LoginPage: React.FC = () => {
 
         try {
             if (isLogin) {
-                const { error } = await supabase.auth.signInWithPassword({
-                    email,
-                    password,
-                });
-                if (error) throw error;
+                await login(email, password);
             } else {
-                const { data, error } = await supabase.auth.signUp({
-                    email,
-                    password,
-                    options: {
-                        emailRedirectTo: window.location.origin,
-                    }
-                });
-                
-                if (error) {
-                    let errorMessage = error.message;
-                    if (error.message.includes('signup is disabled')) {
-                        errorMessage = 'Pendaftaran baru telah dinyahaktifkan.';
-                    } else if (error.message.includes('User already registered')) {
-                        errorMessage = 'E-mel ini sudah didaftarkan.';
-                    }
-                    throw new Error(errorMessage);
+                if (password.length < 8) {
+                    throw new Error('Kata laluan perlu sekurang-kurangnya 8 aksara.');
                 }
-                
-                if (data.session && data.user) {
-                    setMessage('Akaun berjaya dicipta! Anda telah log masuk.');
-                    return;
-                }
-                
-                if (data.user && !data.session) {
-                    setMessage('Akaun berjaya dicipta! Sila semak e-mel anda.');
-                }
+                await register(email, password, name);
+                setMessage('Akaun dicipta. Akses data menunggu kelulusan pentadbir sekolah.');
             }
         } catch (err: unknown) {
-            const error = err as Error;
-            setError(error.message || 'Ralat berlaku semasa pengesahan');
+            setError(errorMessage(err));
         } finally {
             setLoading(false);
         }
@@ -81,6 +58,25 @@ export const LoginPage: React.FC = () => {
                 </div>
 
                 <form onSubmit={handleAuth} className="text-left space-y-5" aria-labelledby="login-title">
+                    {!isLogin && (
+                        <div className="input-group">
+                            <label htmlFor="name" className="font-bold text-slate-800 mb-1 block">Nama Penuh</label>
+                            <div className="relative">
+                                <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" aria-hidden="true" />
+                                <input
+                                    id="name"
+                                    type="text"
+                                    required
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    placeholder="Nama guru"
+                                    className="pl-12 w-full py-3 bg-white border-slate-300 focus:border-emerald-600 transition-all rounded-xl min-h-[44px]"
+                                    aria-required="true"
+                                />
+                            </div>
+                        </div>
+                    )}
+
                     <div className="input-group">
                         <label htmlFor="email" className="font-bold text-slate-800 mb-1 block">E-mel</label>
                         <div className="relative">
@@ -88,6 +84,7 @@ export const LoginPage: React.FC = () => {
                             <input
                                 id="email"
                                 type="email"
+                                autoComplete="email"
                                 required
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
@@ -105,7 +102,9 @@ export const LoginPage: React.FC = () => {
                             <input
                                 id="password"
                                 type="password"
+                                autoComplete={isLogin ? 'current-password' : 'new-password'}
                                 required
+                                minLength={8}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 placeholder="••••••••"
@@ -165,7 +164,11 @@ export const LoginPage: React.FC = () => {
                     <p className="text-slate-600 text-sm font-medium">
                         {isLogin ? 'Belum mempunyai akaun?' : 'Sudah mempunyai akaun?'}
                         <button
-                            onClick={() => setIsLogin(!isLogin)}
+                            onClick={() => {
+                                setIsLogin(!isLogin);
+                                setError(null);
+                                setMessage(null);
+                            }}
                             className="ml-2 text-emerald-700 font-bold hover:underline focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 rounded px-1"
                         >
                             {isLogin ? 'Daftar sekarang' : 'Log masuk'}

@@ -1,8 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Save, ChevronDown, X, Printer, ArrowLeft, AlertCircle, Download, Loader2 } from 'lucide-react';
 import type { RPHRecord } from '../types';
-import { supabase } from '../lib/supabaseClient';
+import { api, errorMessage } from '../lib/apiClient';
+import { todayMalaysia, getMalayDay } from '../lib/dateUtils';
+import type { ReferensiRPH } from '../types';
 import { RPHPrintLayout } from './RPHPrintLayout';
 import { generateRPH_PDF } from '../lib/pdfGenerator';
 import { PDFReadyModal } from './PDFReadyModal';
@@ -12,6 +14,7 @@ interface RPHFormProps {
     onSubmit: (record: Omit<RPHRecord, 'id'>) => Promise<void>;
     onCancel?: () => void;
     initialData?: RPHRecord;
+    currentUserId: string;
 }
 
 const HARI_OPTIONS = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu'];
@@ -38,22 +41,15 @@ const KELAS_MAP: Record<number, string[]> = {
     6: ['6 Naim']
 };
 
-const getMalayDay = (dateString: string) => {
-    const days = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu'];
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return days[date.getDay()];
-};
-
 const parseYearFromKelas = (kelas: string) => {
     const match = kelas.match(/^([1-6])\b/);
     return match ? Number(match[1]) : '';
 };
 
-const DRAFT_KEY = 'erph_form_draft';
-
-export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialData }) => {
-    const initialDate = initialData?.tarikh || new Date().toISOString().split('T')[0];
+export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialData, currentUserId }) => {
+    const initialDate = initialData?.tarikh || todayMalaysia();
+    // Drafts are per account so a shared device cannot leak one teacher's notes to another (audit S-03).
+    const draftKey = `erph_form_draft:${currentUserId}`;
     
     // Form steps: 1: Maklumat Asas, 2: DSKP & Standard, 3: Kandungan PdPC, 4: Semakan
     const [currentStep, setCurrentStep] = useState(1);
@@ -73,6 +69,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
         refleksi: initialData?.content?.refleksi || '',
         sp: initialData?.content?.sp || [] as string[],
         spi: initialData?.content?.spi || [] as Array<{ tp: number; desc: string }>,
+        status: initialData?.status ?? 'draft' as RPHRecord['status'],
     });
 
     const [subjects, setSubjects] = useState<string[]>([]);
@@ -80,10 +77,6 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
     const [selectedYear, setSelectedYear] = useState<number | ''>(initialData?.tahun ?? parseYearFromKelas(initialData?.kelas ?? ''));
     
     // DSKP Hierarchical data
-    const [availableBidang, setAvailableBidang] = useState<string[]>([]);
-    const [availableSK, setAvailableSK] = useState<string[]>([]);
-    const [availableSP, setAvailableSP] = useState<string[]>([]);
-    const [availableSPI, setAvailableSPI] = useState<Array<{ tp: number; desc: string }>>([]);
     
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -99,26 +92,20 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
 
     const firstFieldRef = useRef<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(null);
 
-    // Initial data fetch
+    // Subject/year options come from the DSKP reference data (audit A-01).
     useEffect(() => {
-        const fetchMetadata = async () => {
-            try {
-                const { data: subjekData } = await supabase.rpc('get_unique_subjects');
-                if (subjekData) setSubjects((subjekData as Array<{ subjek: string }>).map((d) => d.subjek));
-
-                const { data: tahunData } = await supabase.rpc('get_unique_years');
-                if (tahunData) setYears((tahunData as Array<{ tahun: number }>).map((d) => d.tahun));
-            } catch (err) {
-                console.error('Error fetching metadata:', err);
-            }
-        };
-        fetchMetadata();
+        api.dskpMeta()
+            .then((meta) => {
+                setSubjects(meta.subjects);
+                setYears(meta.years);
+            })
+            .catch((err) => setError(errorMessage(err)));
     }, []);
 
     // Load draft on mount
     useEffect(() => {
         if (!initialData) {
-            const savedDraft = localStorage.getItem(DRAFT_KEY);
+            const savedDraft = localStorage.getItem(draftKey);
             if (savedDraft) {
                 try {
                     const parsed = JSON.parse(savedDraft);
@@ -136,7 +123,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
     useEffect(() => {
         if (!initialData) {
             const draft = { formData, selectedYear, currentStep };
-            localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+            localStorage.setItem(draftKey, JSON.stringify(draft));
         }
     }, [formData, selectedYear, currentStep, initialData]);
 
@@ -187,101 +174,50 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
         window.scrollTo(0, 0);
     };
 
-    // Fetch Bidang when subjek or year changes
+    const [dskpRows, setDskpRows] = useState<ReferensiRPH[]>([]);
+
+    // One bounded query per subject/year replaces three chained lookups (audit F-08).
     useEffect(() => {
-        const fetchBidang = async () => {
-            if (!formData.subjek || selectedYear === '') {
-                setAvailableBidang([]);
-                return;
-            }
+        if (!formData.subjek || selectedYear === '') {
+            setDskpRows([]);
+            return;
+        }
 
-            const { data } = await supabase
-                .from('referensi_rph')
-                .select('bidang')
-                .eq('subjek', formData.subjek)
-                .eq('tahun', selectedYear);
+        let active = true;
+        api.listDskp({ page: 1, subjek: formData.subjek, tahun: Number(selectedYear), pageSize: 500 })
+            .then((result) => {
+                if (active) setDskpRows(result.data);
+            })
+            .catch((err) => {
+                if (active) setError(errorMessage(err));
+            });
 
-            if (data) {
-                const uniqueBidang = [...new Set(data.map(d => d.bidang || ''))].filter(Boolean).sort();
-                setAvailableBidang(uniqueBidang);
-            }
+        return () => {
+            active = false;
         };
-        fetchBidang();
     }, [formData.subjek, selectedYear]);
 
-    // Fetch SK when bidang changes
-    useEffect(() => {
-        const fetchSK = async () => {
-            if (!formData.subjek || selectedYear === '') {
-                setAvailableSK([]);
-                return;
-            }
+    const availableBidang = useMemo(
+        () => [...new Set(dskpRows.map((row) => row.bidang ?? '').filter(Boolean))].sort(),
+        [dskpRows],
+    );
 
-            // If bidang is required (availableBidang not empty) but not selected, don't fetch
-            if (availableBidang.length > 0 && !formData.bidang) {
-                setAvailableSK([]);
-                return;
-            }
+    const availableSK = useMemo(() => {
+        if (availableBidang.length > 0 && !formData.bidang) return [];
+        return [...new Set(dskpRows
+            .filter((row) => (formData.bidang ? row.bidang === formData.bidang : !row.bidang))
+            .map((row) => row.sk))].sort();
+    }, [dskpRows, availableBidang.length, formData.bidang]);
 
-            let query = supabase
-                .from('referensi_rph')
-                .select('sk')
-                .eq('subjek', formData.subjek)
-                .eq('tahun', selectedYear);
+    const selectedStandard = useMemo(
+        () => dskpRows.find((row) =>
+            row.sk === formData.tajukStandardKandungan &&
+            (formData.bidang ? row.bidang === formData.bidang : !row.bidang)),
+        [dskpRows, formData.tajukStandardKandungan, formData.bidang],
+    );
 
-            if (formData.bidang) {
-                query = query.eq('bidang', formData.bidang);
-            } else {
-                query = query.is('bidang', null);
-            }
-
-            const { data } = await query;
-
-            if (data) {
-                setAvailableSK([...new Set(data.map(d => d.sk))].sort());
-            }
-        };
-        fetchSK();
-    }, [formData.subjek, selectedYear, formData.bidang, availableBidang]);
-
-    // Fetch SP & SPI when SK changes
-    useEffect(() => {
-        const fetchSP_SPI = async () => {
-            if (!formData.subjek || selectedYear === '' || !formData.tajukStandardKandungan) {
-                setAvailableSP([]);
-                setAvailableSPI([]);
-                return;
-            }
-
-            // If bidang is required but not selected
-            if (availableBidang.length > 0 && !formData.bidang) {
-                setAvailableSP([]);
-                setAvailableSPI([]);
-                return;
-            }
-
-            let query = supabase
-                .from('referensi_rph')
-                .select('sp, spi')
-                .eq('subjek', formData.subjek)
-                .eq('tahun', selectedYear)
-                .eq('sk', formData.tajukStandardKandungan);
-
-            if (formData.bidang) {
-                query = query.eq('bidang', formData.bidang);
-            } else {
-                query = query.is('bidang', null);
-            }
-
-            const { data } = await query.maybeSingle();
-
-            if (data) {
-                setAvailableSP(data.sp || []);
-                setAvailableSPI(data.spi || []);
-            }
-        };
-        fetchSP_SPI();
-    }, [formData.subjek, selectedYear, formData.bidang, formData.tajukStandardKandungan, availableBidang]);
+    const availableSP = selectedStandard?.sp ?? [];
+    const availableSPI = selectedStandard?.spi ?? [];
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -352,6 +288,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                 masa: formData.masa,
                 subjek: formData.subjek,
                 user_id: initialData?.user_id || '',
+                status: formData.status,
                 content: {
                     bidang: formData.bidang,
                     tajukStandardKandungan: formData.tajukStandardKandungan,
@@ -366,11 +303,11 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
             await onSubmit(recordToSubmit);
             
             // Clear draft
-            localStorage.removeItem(DRAFT_KEY);
+            localStorage.removeItem(draftKey);
 
             if (!initialData) {
                 // Reset form
-                const today = new Date().toISOString().split('T')[0];
+                const today = todayMalaysia();
                 setFormData({
                     tarikh: today,
                     hari: getMalayDay(today),
@@ -384,6 +321,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                     refleksi: '',
                     sp: [],
                     spi: [],
+                    status: 'draft',
                 });
                 setSelectedYear('');
                 setCurrentStep(1);
@@ -512,7 +450,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                                         value={formData.tarikh} 
                                         onChange={handleChange} 
                                         required 
-                                        ref={firstFieldRef as any}
+                                        ref={firstFieldRef as React.Ref<HTMLInputElement>}
                                     />
                                 </div>
 
@@ -647,7 +585,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                                         onChange={handleChange} 
                                         disabled={!formData.subjek || selectedYear === '' || availableBidang.length === 0}
                                         required={availableBidang.length > 0}
-                                        ref={firstFieldRef as any}
+                                        ref={firstFieldRef as React.Ref<HTMLSelectElement>}
                                     >
                                         <option value="">{availableBidang.length === 0 ? 'Tiada Bidang' : 'Pilih Bidang'}</option>
                                         {availableBidang.map(b => <option key={b} value={b}>{b}</option>)}
@@ -786,7 +724,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                                     rows={3} 
                                     required 
                                     className="font-jawi" 
-                                    ref={firstFieldRef as any}
+                                    ref={firstFieldRef as React.Ref<HTMLTextAreaElement>}
                                 />
                             </div>
 
@@ -818,7 +756,7 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                             }}>
                                 <h3 id="summary-title" style={{ marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Semakan Rekod</h3>
                                 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6" tabIndex={0} ref={firstFieldRef as any}>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6" tabIndex={0} ref={firstFieldRef as React.Ref<HTMLDivElement>}>
                                     <div>
                                         <p style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 'bold' }}>Tarikh & Masa</p>
                                         <p>{formData.tarikh} ({formData.hari})</p>
@@ -846,6 +784,16 @@ export const RPHForm: React.FC<RPHFormProps> = ({ onSubmit, onCancel, initialDat
                                     </div>
                                 </div>
                                 
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '1.5rem', fontWeight: 600 }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.status === 'published'}
+                                        onChange={(e) => setFormData((prev) => ({ ...prev, status: e.target.checked ? 'published' : 'draft' }))}
+                                        style={{ width: '20px', height: '20px' }}
+                                    />
+                                    Tandakan rekod ini sebagai Diterbitkan
+                                </label>
+
                                 <p style={{ fontSize: '0.875rem', color: '#64748b', fontStyle: 'italic', marginTop: '2rem' }}>
                                     Sila pastikan semua maklumat adalah betul sebelum menyimpan.
                                 </p>
