@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { pool, withPrivileged } from './pool';
+import { pool, withPrivileged } from './pool.js';
 
 /**
  * Idempotent DSKP seed. Never truncates and never overwrites edited rows

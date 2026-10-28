@@ -1,5 +1,5 @@
-import type { Profile, UserRole } from '../../src/types';
-import type { Db } from '../db/pool';
+import type { Profile, UserRole } from '../../src/types.js';
+import type { Db } from '../db/pool.js';
 
 interface Row {
   id: string;

@@ -1,6 +1,6 @@
-import type { ReferensiRPH } from '../../src/types';
-import type { Db } from '../db/pool';
-import { likeTerm } from './rph-records';
+import type { ReferensiRPH } from '../../src/types.js';
+import type { Db } from '../db/pool.js';
+import { likeTerm } from './rph-records.js';
 
 interface Row {
   id: string;

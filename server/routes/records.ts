@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { withUser } from '../db/pool';
-import { ApiError } from '../lib/http';
-import { requireActive, requireSession, type AuthedRequest } from '../middleware/session';
-import { createRecord, deleteRecord, listRecords, updateRecord } from '../repositories/rph-records';
+import { withUser } from '../db/pool.js';
+import { ApiError } from '../lib/http.js';
+import { requireActive, requireSession, type AuthedRequest } from '../middleware/session.js';
+import { createRecord, deleteRecord, listRecords, updateRecord } from '../repositories/rph-records.js';
 
 const contentSchema = z.object({
   bidang: z.string().optional(),

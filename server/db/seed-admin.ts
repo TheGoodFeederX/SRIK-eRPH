@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { pool, withPrivileged } from './pool';
+import { pool, withPrivileged } from './pool.js';
 
 /**
  * Promotes an existing Neon Auth account to active admin.

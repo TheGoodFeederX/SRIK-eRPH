@@ -1,11 +1,11 @@
 import express from 'express';
 import cors from 'cors';
-import { errorHandler, notFound } from './lib/http';
-import { createAdminRoutes } from './routes/admin';
-import { createAuthRoutes } from './routes/auth';
-import { createDskpRoutes } from './routes/dskp';
-import { createProfileRoutes } from './routes/profile';
-import { createRecordRoutes } from './routes/records';
+import { errorHandler, notFound } from './lib/http.js';
+import { createAdminRoutes } from './routes/admin.js';
+import { createAuthRoutes } from './routes/auth.js';
+import { createDskpRoutes } from './routes/dskp.js';
+import { createProfileRoutes } from './routes/profile.js';
+import { createRecordRoutes } from './routes/records.js';
 
 export function createApp() {
   const app = express();

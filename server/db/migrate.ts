@@ -2,7 +2,7 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pool, withPrivileged } from './pool';
+import { pool, withPrivileged } from './pool.js';
 
 const sqlDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'sql');
 

@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { withUser } from '../db/pool';
-import { ApiError } from '../lib/http';
-import { requireActive, requireSession, type AuthedRequest } from '../middleware/session';
-import { renameProfile } from '../repositories/profiles';
+import { withUser } from '../db/pool.js';
+import { ApiError } from '../lib/http.js';
+import { requireActive, requireSession, type AuthedRequest } from '../middleware/session.js';
+import { renameProfile } from '../repositories/profiles.js';
 
 const renameSchema = z.object({ name: z.string().trim().min(1).max(120) });
 

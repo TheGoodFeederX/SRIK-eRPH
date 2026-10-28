@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { pool, withPrivileged, withUser } from './pool';
+import { pool, withPrivileged, withUser } from './pool.js';
 
 /**
  * Database-level access control (audit S-01, S-02, TC-NEON-RLS-01/02, TC-NEON-AUTH-02).

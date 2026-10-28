@@ -1,5 +1,5 @@
-import type { RPHRecord } from '../../src/types';
-import type { Db } from '../db/pool';
+import type { RPHRecord } from '../../src/types.js';
+import type { Db } from '../db/pool.js';
 
 interface Row {
   id: string;

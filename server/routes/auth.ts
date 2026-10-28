@@ -1,9 +1,9 @@
 import { Router, type Response } from 'express';
 import { z } from 'zod';
-import { withUser } from '../db/pool';
-import { ApiError } from '../lib/http';
-import { authCookieName, neonAuth } from '../lib/neon-auth';
-import { readSessionToken, requireSession, type AuthedRequest } from '../middleware/session';
+import { withUser } from '../db/pool.js';
+import { ApiError } from '../lib/http.js';
+import { authCookieName, neonAuth } from '../lib/neon-auth.js';
+import { readSessionToken, requireSession, type AuthedRequest } from '../middleware/session.js';
 
 const credentialsSchema = z.object({
   email: z.string().trim().email().max(200),
