@@ -1,4 +1,4 @@
-import type { Profile, UserRole } from '../../src/types.js';
+import type { Profile, UserRole } from '../../src/types/index.js';
 import type { Db } from '../db/pool.js';
 
 interface Row {

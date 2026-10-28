@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import type { Profile } from '../../src/types.js';
+import type { Profile } from '../../src/types/index.js';
 import { withUser } from '../db/pool.js';
 import { ApiError } from '../lib/http.js';
 import { authCookieName, neonAuth, type NeonAuthUser } from '../lib/neon-auth.js';

@@ -1,4 +1,4 @@
-import type { RPHRecord } from '../../src/types.js';
+import type { RPHRecord } from '../../src/types/index.js';
 import type { Db } from '../db/pool.js';
 
 interface Row {

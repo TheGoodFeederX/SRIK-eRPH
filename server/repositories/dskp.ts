@@ -1,4 +1,4 @@
-import type { ReferensiRPH } from '../../src/types.js';
+import type { ReferensiRPH } from '../../src/types/index.js';
 import type { Db } from '../db/pool.js';
 import { likeTerm } from './rph-records.js';
 
