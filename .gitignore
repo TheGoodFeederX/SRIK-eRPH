@@ -39,3 +39,15 @@ coverage/
 
 # Misc
 Thumbs.db
+
+# Local databases and dumps (audit O-02)
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.dump
+*.bak
+
+# Vercel
+.vercel

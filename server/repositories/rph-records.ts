@@ -1,215 +1,144 @@
-import { nanoid } from 'nanoid';
-import type { AppDatabase } from '../db/connection';
-import type { PaginatedResponse, RPHRecord } from '../../src/types';
+import type { RPHRecord } from '../../src/types';
+import type { Db } from '../db/pool';
 
-interface RphRecordRow {
+interface Row {
   id: string;
   user_id: string;
+  tarikh: string | Date;
+  hari: string;
+  tahun: number;
+  kelas: string;
+  masa: string;
+  subjek: string;
+  content: RPHRecord['content'];
+  status: RPHRecord['status'];
+  created_at: string | Date;
+  updated_at: string | Date;
+}
+
+const iso = (value: string | Date) => (value instanceof Date ? value.toISOString() : value);
+
+export function mapRow(row: Row): RPHRecord {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    tarikh: iso(row.tarikh).slice(0, 10),
+    hari: row.hari,
+    tahun: row.tahun,
+    kelas: row.kelas,
+    masa: row.masa,
+    subjek: row.subjek,
+    content: row.content ?? {},
+    status: row.status ?? 'draft',
+    created_at: iso(row.created_at),
+    updated_at: iso(row.updated_at),
+  };
+}
+
+/** Escapes LIKE metacharacters so user input cannot rewrite the filter (audit F-05). */
+export const likeTerm = (term: string) => `%${term.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+
+
+export interface ListQuery {
+  page: number;
+  pageSize: number;
+  search: string;
+}
+
+export async function listRecords(db: Db, userId: string, query: ListQuery) {
+  const offset = (query.page - 1) * query.pageSize;
+  const params: unknown[] = [userId];
+
+  let filter = '';
+  if (query.search) {
+    params.push(likeTerm(query.search));
+    filter = `and (subjek ilike $2 escape '\\' or kelas ilike $2 escape '\\' or hari ilike $2 escape '\\' or masa ilike $2 escape '\\')`;
+  }
+  params.push(query.pageSize, offset);
+
+  const result = await db.query<Row & { total_count: string }>(
+    `select *, count(*) over() as total_count
+       from public.rph_records
+      where user_id = $1 ${filter}
+      order by tarikh desc, created_at desc
+      limit $${params.length - 1} offset $${params.length}`,
+    params,
+  );
+
+  return {
+    data: result.rows.map(mapRow),
+    totalCount: Number(result.rows[0]?.total_count ?? 0),
+    page: query.page,
+    pageSize: query.pageSize,
+  };
+}
+
+export interface RecordInput {
   tarikh: string;
   hari: string;
   tahun: number;
   kelas: string;
   masa: string;
   subjek: string;
-  content: string;
-  created_at: string;
-  updated_at: string;
+  content: RPHRecord['content'];
+  status?: RPHRecord['status'];
 }
 
-interface RphListQuery {
-  page: number;
-  pageSize: number;
-  search?: string;
-}
-
-type RphCreateInput = Omit<RPHRecord, 'id' | 'user_id' | 'created_at' | 'updated_at'>;
-type RphUpdateInput = Partial<Omit<RPHRecord, 'id' | 'user_id'>>;
-
-function parseJsonObject(value: string): RPHRecord['content'] {
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as RPHRecord['content']) : {};
-  } catch {
-    return {};
-  }
-}
-
-function mapRphRecord(row: RphRecordRow): RPHRecord {
-  return {
-    id: row.id,
-    user_id: row.user_id,
-    tarikh: row.tarikh,
-    hari: row.hari,
-    tahun: row.tahun,
-    kelas: row.kelas,
-    masa: row.masa,
-    subjek: row.subjek,
-    content: parseJsonObject(row.content),
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-  };
-}
-
-function requireTahun(tahun: number | undefined): number {
-  if (tahun === undefined) {
-    throw new Error('RPH record tahun is required.');
-  }
-
-  return tahun;
-}
-
-function paginate<T>(data: T[], total: number, page: number, pageSize: number): PaginatedResponse<T> {
-  return {
-    data,
-    totalCount: total,
-    page,
-    pageSize,
-  };
-}
-
-function normalizePositiveInteger(value: number, fallback: number, max = Number.MAX_SAFE_INTEGER): number {
-  if (!Number.isFinite(value)) {
-    return fallback;
-  }
-
-  return Math.min(max, Math.max(1, Math.trunc(value)));
-}
-
-function normalizePage(query: RphListQuery): { page: number; pageSize: number; limit: number; offset: number } {
-  const page = normalizePositiveInteger(query.page, 1);
-  const pageSize = normalizePositiveInteger(query.pageSize, 10, 100);
-
-  return {
-    page,
-    pageSize,
-    limit: pageSize,
-    offset: (page - 1) * pageSize,
-  };
-}
-
-export function listRphRecords(db: AppDatabase, userId: string, query: RphListQuery): PaginatedResponse<RPHRecord> {
-  const pagination = normalizePage(query);
-  const params: Record<string, string | number> = {
-    userId,
-    limit: pagination.limit,
-    offset: pagination.offset,
-  };
-  const filters = ['user_id = @userId'];
-
-  if (query.search?.trim()) {
-    params.search = `%${query.search.trim()}%`;
-    filters.push('(tarikh like @search or hari like @search or kelas like @search or subjek like @search)');
-  }
-
-  const where = filters.join(' and ');
-  const totalRow = db.prepare(`select count(*) as total from rph_records where ${where}`).get(params) as { total: number };
-  const rows = db
-    .prepare(
-      `
-      select id, user_id, tarikh, hari, tahun, kelas, masa, subjek, content, created_at, updated_at
-      from rph_records
-      where ${where}
-      order by tarikh desc, created_at desc
-      limit @limit offset @offset
-    `,
-    )
-    .all(params) as RphRecordRow[];
-
-  return paginate(rows.map(mapRphRecord), totalRow.total, pagination.page, pagination.pageSize);
-}
-
-export function createRphRecord(db: AppDatabase, userId: string, input: RphCreateInput): RPHRecord {
-  const row = db
-    .prepare(
-      `
-      insert into rph_records (id, user_id, tarikh, hari, tahun, kelas, masa, subjek, content)
-      values (@id, @userId, @tarikh, @hari, @tahun, @kelas, @masa, @subjek, @content)
-      returning id, user_id, tarikh, hari, tahun, kelas, masa, subjek, content, created_at, updated_at
-    `,
-    )
-    .get({
-      id: nanoid(),
+export async function createRecord(db: Db, userId: string, input: RecordInput) {
+  const result = await db.query<Row>(
+    `insert into public.rph_records (user_id, tarikh, hari, tahun, kelas, masa, subjek, content, status)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, coalesce($9, 'draft'))
+     returning *`,
+    [
       userId,
-      tarikh: input.tarikh,
-      hari: input.hari,
-      tahun: requireTahun(input.tahun),
-      kelas: input.kelas,
-      masa: input.masa,
-      subjek: input.subjek,
-      content: JSON.stringify(input.content ?? {}),
-    }) as RphRecordRow;
+      input.tarikh,
+      input.hari,
+      input.tahun,
+      input.kelas,
+      input.masa,
+      input.subjek,
+      JSON.stringify(input.content ?? {}),
+      input.status ?? null,
+    ],
+  );
 
-  return mapRphRecord(row);
+  return mapRow(result.rows[0]);
 }
 
-export function updateRphRecord(
-  db: AppDatabase,
-  userId: string,
-  id: string,
-  input: RphUpdateInput,
-): RPHRecord | null {
-  const updates: string[] = [];
-  const params: Record<string, string | number> = { id, userId };
+export async function updateRecord(db: Db, id: string, input: Partial<RecordInput>) {
+  const fields: string[] = [];
+  const params: unknown[] = [id];
 
-  if (input.tarikh !== undefined) {
-    updates.push('tarikh = @tarikh');
-    params.tarikh = input.tarikh;
-  }
-  if (input.hari !== undefined) {
-    updates.push('hari = @hari');
-    params.hari = input.hari;
-  }
-  if (input.tahun !== undefined) {
-    updates.push('tahun = @tahun');
-    params.tahun = input.tahun;
-  }
-  if (input.kelas !== undefined) {
-    updates.push('kelas = @kelas');
-    params.kelas = input.kelas;
-  }
-  if (input.masa !== undefined) {
-    updates.push('masa = @masa');
-    params.masa = input.masa;
-  }
-  if (input.subjek !== undefined) {
-    updates.push('subjek = @subjek');
-    params.subjek = input.subjek;
-  }
-  if (input.content !== undefined) {
-    updates.push('content = @content');
-    params.content = JSON.stringify(input.content);
+  const push = (column: string, value: unknown) => {
+    params.push(value);
+    fields.push(`${column} = $${params.length}`);
+  };
+
+  if (input.tarikh !== undefined) push('tarikh', input.tarikh);
+  if (input.hari !== undefined) push('hari', input.hari);
+  if (input.tahun !== undefined) push('tahun', input.tahun);
+  if (input.kelas !== undefined) push('kelas', input.kelas);
+  if (input.masa !== undefined) push('masa', input.masa);
+  if (input.subjek !== undefined) push('subjek', input.subjek);
+  if (input.content !== undefined) push('content', JSON.stringify(input.content));
+  if (input.status !== undefined) push('status', input.status);
+
+  if (fields.length === 0) {
+    return null;
   }
 
-  if (updates.length === 0) {
-    const row = db
-      .prepare(
-        `
-        select id, user_id, tarikh, hari, tahun, kelas, masa, subjek, content, created_at, updated_at
-        from rph_records
-        where id = @id and user_id = @userId
-      `,
-      )
-      .get(params) as RphRecordRow | undefined;
-    return row ? mapRphRecord(row) : null;
-  }
+  const result = await db.query<Row>(
+    `update public.rph_records
+        set ${fields.join(', ')}, updated_at = now()
+      where id = $1
+      returning *`,
+    params,
+  );
 
-  updates.push("updated_at = datetime('now')");
-
-  const row = db
-    .prepare(
-      `
-      update rph_records
-      set ${updates.join(', ')}
-      where id = @id and user_id = @userId
-      returning id, user_id, tarikh, hari, tahun, kelas, masa, subjek, content, created_at, updated_at
-    `,
-    )
-    .get(params) as RphRecordRow | undefined;
-
-  return row ? mapRphRecord(row) : null;
+  return result.rows[0] ? mapRow(result.rows[0]) : null;
 }
 
-export function deleteRphRecord(db: AppDatabase, userId: string, id: string): boolean {
-  const result = db.prepare('delete from rph_records where id = ? and user_id = ?').run(id, userId);
-  return result.changes > 0;
+export async function deleteRecord(db: Db, id: string) {
+  const result = await db.query('delete from public.rph_records where id = $1 returning id', [id]);
+  return result.rowCount === 1;
 }

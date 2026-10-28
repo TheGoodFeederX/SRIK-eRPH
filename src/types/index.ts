@@ -6,8 +6,11 @@ export interface AppUser {
     name: string;
 }
 
+export type AccountStatus = 'pending' | 'active' | 'disabled';
+
 export interface Profile extends AppUser {
     role: UserRole;
+    status: AccountStatus;
     created_at?: string;
     updated_at?: string;
 }
@@ -61,4 +64,4 @@ export interface ApiErrorResponse {
     };
 }
 
-export type Tab = 'form' | 'records' | 'dskp' | 'settings';
+export type Tab = 'form' | 'records' | 'dskp' | 'settings' | 'admin';

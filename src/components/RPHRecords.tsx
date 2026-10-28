@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Edit2, Trash2, Printer, Search, Loader2, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { RPHRecord } from '../types';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { generateRPH_PDF, generateBulkRPH_PDF } from '../lib/pdfGenerator';
 import { PDFReadyModal } from './PDFReadyModal';
+import { todayMalaysia } from '../lib/dateUtils';
 
 interface RPHRecordsProps {
     records: RPHRecord[];
@@ -15,7 +16,7 @@ interface RPHRecordsProps {
     pageSize: number;
     searchTerm: string;
     setSearchTerm: (term: string) => void;
-    onDelete: (id: string) => void;
+    onDelete: (id: string) => Promise<void>;
     onEdit: (record: RPHRecord) => void;
 }
 
@@ -24,7 +25,7 @@ const RPHCard: React.FC<{
     isSelected: boolean;
     onToggleSelect: (id: string) => void;
     onEdit: (record: RPHRecord) => void;
-    onDelete: (id: string) => void;
+    onDelete: (id: string) => Promise<void>;
     onPrint: (record: RPHRecord) => void;
 }> = ({ record, isSelected, onToggleSelect, onEdit, onDelete, onPrint }) => {
     return (
@@ -84,7 +85,9 @@ const RPHCard: React.FC<{
                     style={{ padding: '0.5rem', minHeight: '44px', color: '#ef4444' }} 
                     onClick={() => {
                         if (confirm('Adakah anda pasti mahu memadam rekod ini?')) {
-                            onDelete(record.id);
+                            void onDelete(record.id).catch((err: unknown) => {
+                                alert(err instanceof Error ? err.message : 'Gagal memadam rekod.');
+                            });
                         }
                     }}
                 >
@@ -122,6 +125,12 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
         fileName: ''
     });
 
+    // Only IDs on the current page count, so stale selections cannot produce an empty
+    // bulk PDF after paging or searching (audit F-07).
+    const selectedRecords = records.filter(r => selectedIds.includes(r.id));
+    const selectedOnPage = selectedRecords.map(r => r.id);
+    const isBulkPDF = selectedRecords.length > 0;
+
     const toggleSelect = (id: string) => {
         setSelectedIds(prev =>
             prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
@@ -129,14 +138,14 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
     };
 
     const toggleSelectAll = () => {
-        if (selectedIds.length === records.length && records.length > 0) {
+        if (selectedOnPage.length === records.length && records.length > 0) {
             setSelectedIds([]);
         } else {
             setSelectedIds(records.map(r => r.id));
         }
     };
 
-    const handleDownloadAll = () => {
+    const handleDownloadAll = async () => {
         const dataToExport = records.map(rec => ({
             'Tarikh': rec.tarikh,
             'Hari': rec.hari,
@@ -148,14 +157,27 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
             'Refleksi': rec.content?.refleksi || ''
         }));
 
-        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Rekod eRPH');
-        XLSX.writeFile(workbook, `Rekod_eRPH_Halaman_${page + 1}_${new Date().toISOString().split('T')[0]}.xlsx`);
-    };
+        // exceljs replaces SheetJS 0.18.5 (GHSA-4r6h-8v6p-xvw6, GHSA-5pgg-2g8v-p4x9 — audit S-06).
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Rekod eRPH');
+        worksheet.columns = Object.keys(dataToExport[0] ?? { Tarikh: '' }).map((header) => ({
+            header,
+            key: header,
+            width: 24,
+        }));
+        worksheet.addRows(dataToExport);
+        worksheet.getRow(1).font = { bold: true };
 
-    const isBulkPDF = selectedIds.length > 0;
-    const selectedRecords = records.filter(r => selectedIds.includes(r.id));
+        const buffer = await workbook.xlsx.writeBuffer();
+        const url = URL.createObjectURL(
+            new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+        );
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Rekod_eRPH_Halaman_${page}_${todayMalaysia()}.xlsx`;
+        link.click();
+        URL.revokeObjectURL(url);
+    };
 
     const totalPages = Math.ceil(totalCount / pageSize);
 
@@ -166,7 +188,7 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
         try {
             const blob = await generateBulkRPH_PDF(selectedRecords);
             const url = URL.createObjectURL(blob);
-            const fileName = `eRPH_Bulk_${new Date().toISOString().split('T')[0]}.pdf`;
+            const fileName = `eRPH_Bulk_${todayMalaysia()}.pdf`;
             
             setIsGeneratingPDF(false);
             setPdfModalData({ isOpen: true, url, fileName });
@@ -223,7 +245,7 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
                         <button
                             className="btn btn-outline w-full md:w-auto"
                             style={{ height: '48px' }}
-                            onClick={isBulkPDF ? handleDownloadPDFBulk : handleDownloadAll}
+                            onClick={isBulkPDF ? handleDownloadPDFBulk : () => void handleDownloadAll()}
                             disabled={records.length === 0}
                             title={isBulkPDF ? "Muat Turun Pilihan (PDF)" : "Muat Turun Halaman (Excel)"}
                         >
@@ -238,7 +260,7 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
                                 value={searchTerm}
                                 onChange={(e) => {
                                     setSearchTerm(e.target.value);
-                                    setPage(0);
+                                    setPage(1);
                                 }}
                             />
                         </div>
@@ -261,7 +283,7 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
                                     </div>
                                     <input
                                         type="checkbox"
-                                        checked={selectedIds.length === records.length && records.length > 0}
+                                        checked={selectedOnPage.length === records.length && records.length > 0}
                                         onChange={toggleSelectAll}
                                         className="w-5 h-5"
                                     />
@@ -295,7 +317,7 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
                                 <th style={{ width: '40px' }}>
                                     <input
                                         type="checkbox"
-                                        checked={selectedIds.length === records.length && records.length > 0}
+                                        checked={selectedOnPage.length === records.length && records.length > 0}
                                         onChange={toggleSelectAll}
                                     />
                                 </th>
@@ -354,7 +376,9 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
                                                     </button>
                                                     <button className="btn btn-outline" style={{ padding: '0.5rem', color: '#ef4444' }} title="Padam" onClick={() => {
                                                         if (confirm('Adakah anda pasti mahu memadam rekod ini?')) {
-                                                            onDelete(rec.id);
+                                                            void onDelete(rec.id).catch((err: unknown) => {
+                                                                alert(err instanceof Error ? err.message : 'Gagal memadam rekod.');
+                                                            });
                                                         }
                                                     }}>
                                                         <Trash2 size={16} />
@@ -409,8 +433,8 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
                         <button 
                             className="btn btn-outline" 
                             style={{ padding: '0.5rem' }}
-                            onClick={() => setPage(Math.max(0, page - 1))}
-                            disabled={page === 0}
+                            onClick={() => setPage(Math.max(1, page - 1))}
+                            disabled={page === 1}
                         >
                             <ChevronLeft size={20} />
                         </button>
@@ -419,9 +443,9 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
                             {Array.from({ length: totalPages }, (_, i) => (
                                 <button
                                     key={i}
-                                    className={`btn ${page === i ? 'btn-primary' : 'btn-outline'}`}
+                                    className={`btn ${page === i + 1 ? 'btn-primary' : 'btn-outline'}`}
                                     style={{ padding: '0.5rem 1rem', minWidth: '40px' }}
-                                    onClick={() => setPage(i)}
+                                    onClick={() => setPage(i + 1)}
                                 >
                                     {i + 1}
                                 </button>
@@ -431,8 +455,8 @@ export const RPHRecords: React.FC<RPHRecordsProps> = ({
                         <button 
                             className="btn btn-outline" 
                             style={{ padding: '0.5rem' }}
-                            onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-                            disabled={page === totalPages - 1}
+                            onClick={() => setPage(Math.min(totalPages, page + 1))}
+                            disabled={page === totalPages}
                         >
                             <ChevronRight size={20} />
                         </button>
